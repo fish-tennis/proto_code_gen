@@ -1,7 +1,10 @@
 # proto_code_gen
 项目中,我们经常希望能给proto生成message增加一些自定义的设置,如struct tag.
-增加自定义的struct tag,可以用[protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag),
-但是protoc-go-inject-tag只能给message的字段加struct tag,因为golang没有给struct结构体tag接口.
+
+增加自定义的struct tag,可以用[protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag)
+
+但是protoc-go-inject-tag只能给message的字段加struct tag,因为golang并没有给struct结构体提供tag接口.
+
 proto_code_gen提供了一种给message增加类似struct tag的方式
 
 ## 游戏项目常用的proto风格
@@ -33,12 +36,14 @@ message Res {
 ```go
 // 回调函数
 func OnReq(conn Connection, m Message) {
+	// 手动转换message类型
 	req := m.(*pb.Req)
 	// ...
 	res := new(pb.Res)
+	// 手动填写消息号
 	conn.Send(pb.CmdTest_Cmd_Res, res)
 }
-// 注册消息回调
+// 注册消息回调,手动填写消息号
 register(pb.CmdTest_Cmd_Req, OnReq)
 ```
 
@@ -93,11 +98,14 @@ func sendRes(conn Connection, res *pb.Res) {
 protoc_code_gen -input=/dir/*.pb.go -config=./code_templates.json
 ```
 项目需要根据自己的需求,修改code_templates.json里面的内容,从而生成不同的代码.
+
 proto_code_gen项目里自带的code_templates.json是针对[gserver](https://github.com/fish-tennis/gserver)用的
 
 ## 原理
-protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的message结构体上的注释,
+protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的message结构体上的注释.
+
 如果code_templates.json配置了对应的关键字,则按照代码模板进行相关的文本替换,并自动生成代码文件.
+
 可替换的内容:
 - {MessageName}: 消息结构体的名字
 - {protoName}: proto文件名
