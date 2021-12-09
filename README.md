@@ -117,6 +117,7 @@ protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的messag
 - {ProtoName}: 首字母大写的proto文件名
 - {PackageName}: *.pb.go文件的package名
 - {Value}: 注释里可以加一个Value值,如@Player:TheValue
+- {Comment}: message的注释(排除了@key)
 
 ## 参考
 [protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag)

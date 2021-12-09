@@ -14,8 +14,9 @@
       ""
     ],
     "funcTemplate": [
+      "{Comment}",
       "func (this *Player) Send{MessageName}(packet *pb.{MessageName}) bool {",
-      " return this.Send(Cmd(pb.Cmd{ProtoName}_Cmd_{MessageName}), packet)",
+      "   return this.Send(Cmd(pb.Cmd{ProtoName}_Cmd_{MessageName}), packet)",
       "}",
       ""
     ]
@@ -33,6 +34,7 @@
       ""
     ],
     "funcTemplate":[
+      "{Comment}",
       "func Send{MessageName}(conn Connection, packet *pb.{MessageName}) bool {",
       "   return conn.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)",
       "}",
@@ -55,9 +57,11 @@
       "",
       "// 自动注册玩家组件相关消息回调",
       "func player_component_handler_auto_register(handler *ClientConnectionHandler) {",
+      "",
       ""
     ],
     "funcTemplate":[
+      "   {Comment}",
       "   handler.RegisterProtoCodeGen(\"{protoName}\", Cmd(pb.Cmd{ProtoName}_Cmd_{MessageName}), func() proto.Message {return new(pb.{MessageName})}, func(c Component, m proto.Message) {",
       "       On{MessageName}(c.(*{ProtoName}), m.(*pb.{MessageName}))",
       "   })"

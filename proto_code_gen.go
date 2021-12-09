@@ -24,6 +24,8 @@ type ProtoMessageStructInfo struct {
 	keyComment  string
 	// 注释关键字可以对应一个值
 	keyCommentValue string
+	// 排除keyComment后的注释
+	normalComment string
 	// *pb.go的package name
 	pbPackageName string
 	// message的结构信息
@@ -122,10 +124,11 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 		// struct的注释在genDecl.Doc里
 		if genDecl.Doc != nil {
 			keyChecker := make(map[string]struct{})
-			for _,structComment := range genDecl.Doc.List {
+			for i,structComment := range genDecl.Doc.List {
 				comment := strings.TrimPrefix(structComment.Text, "//")
 				comment = strings.TrimSpace(comment)
 				commentValue := ""
+				normalComment := ""
 				var codeTemplate *CodeTemplate
 				for _,template := range parserResult.codeTemplates {
 					lowerComment := strings.ToLower(comment)
@@ -140,6 +143,16 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 							commentValue = strings.TrimSpace(kv[1])
 						}
 					}
+					if codeTemplate != nil && normalComment == "" {
+						for j,v := range genDecl.Doc.List {
+							if j != i {
+								if normalComment != "" {
+									normalComment += "\n"
+								}
+								normalComment += v.Text
+							}
+						}
+					}
 				}
 				if codeTemplate != nil {
 					// 排重
@@ -151,6 +164,7 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 						messageName: typeSpec.Name.Name,
 						keyComment:  codeTemplate.KeyComment,
 						keyCommentValue: commentValue,
+						normalComment: normalComment,
 						pbPackageName: f.Name.Name,
 						structType:  structDecl,
 					}
@@ -224,6 +238,7 @@ func generateCode(parserResult *ParserResult, key string) {
 			funcStr = strings.ReplaceAll(funcStr, "{ProtoName}", ProtoName)
 			funcStr = strings.ReplaceAll(funcStr, "{PackageName}", structInfo.pbPackageName)
 			funcStr = strings.ReplaceAll(funcStr, "{Value}", structInfo.keyCommentValue)
+			funcStr = strings.ReplaceAll(funcStr, "{Comment}", structInfo.normalComment)
 			builder.WriteString(funcStr)
 			builder.WriteString("\n")
 		}
