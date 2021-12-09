@@ -42,8 +42,8 @@ type CodeTemplate struct {
 	package game
 	import "github.com/fish-tennis/gserver/pb"
 	*/
-	// 文件头
-	Header string
+	// 文件头,用[]string,为了解决code_templates.json里不方便写换行的问题
+	Header []string
 
 	/*
 	@Player对应的函数模板:
@@ -56,10 +56,10 @@ type CodeTemplate struct {
 	}
 	*/
 	// 函数替换模板
-	FuncTemplate string
+	FuncTemplate []string
 
 	// 文件尾
-	Tail string
+	Tail []string
 }
 
 type CodeTemplates []*CodeTemplate
@@ -206,8 +206,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 func generateCode(parserResult *ParserResult, key string) {
 	codeTemplate := parserResult.GetCodeTemplate(key)
 	builder := strings.Builder{}
-	builder.WriteString(codeTemplate.Header)
-	builder.WriteString("\n\n")
+	builder.WriteString(strings.Join(codeTemplate.Header, "\n"))
 	for _,structInfoList := range parserResult.protoMap {
 		for _,structInfo := range structInfoList {
 			if structInfo.keyComment != codeTemplate.KeyComment {
@@ -218,7 +217,7 @@ func generateCode(parserResult *ParserResult, key string) {
 			// 首字母大写
 			ProtoName := strings.ToUpper(protoFileName[:1]) + protoFileName[1:]
 			messageName := structInfo.messageName
-			funcStr := codeTemplate.FuncTemplate
+			funcStr := strings.Join(codeTemplate.FuncTemplate, "\n")
 			// 替换掉代码模板中的关键字
 			funcStr = strings.ReplaceAll(funcStr, "{MessageName}", messageName)
 			funcStr = strings.ReplaceAll(funcStr, "{protoName}", protoName)
@@ -229,7 +228,7 @@ func generateCode(parserResult *ParserResult, key string) {
 			builder.WriteString("\n")
 		}
 	}
-	builder.WriteString(codeTemplate.Tail)
+	builder.WriteString(strings.Join(codeTemplate.Tail, "\n"))
 	os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
 }
 

@@ -43,7 +43,7 @@ func OnReq(conn Connection, m Message) {
 	// 手动填写消息号
 	conn.Send(pb.CmdTest_Cmd_Res, res)
 }
-// 注册消息回调,手动填写消息号
+// 手动注册消息回调,手动填写消息号
 register(pb.CmdTest_Cmd_Req, OnReq)
 ```
 
@@ -62,14 +62,14 @@ enum CmdTest {
 }
 
 // 客户端的请求消息
-// @Handler对应code_templates.json里面的关键字
+// @Handler用来自动注册回调函数
 // @Handler
 message Req {
   string content = 1;
 }
 
 // 服务器回复消息
-// @Player对应code_templates.json里面的关键字
+// @Player用来自动生成发送消息的接口
 // @Player
 message Res {
   string result = 1;
@@ -77,7 +77,7 @@ message Res {
 ```
 ```go
 // file: auto_register_gen.go
-// 工具生成的自动注册函数
+// 工具生成的自动注册函数,无需为每个消息单独注册
 func auto_register() {
 	// 工具生成的自动注册函数,应用层无需手动填写消息号
     register(pb.CmdTest_Cmd_Req, OnReq)
@@ -94,12 +94,17 @@ func sendRes(conn Connection, res *pb.Res) {
 ```
 
 ## 使用proto_code_gen
+编译
+```console
+go build protoc_code_gen.go
+```
+运行
 ```console
 protoc_code_gen -input=/dir/*.pb.go -config=./code_templates.json
 ```
 项目需要根据自己的需求,修改code_templates.json里面的内容,从而生成不同的代码.
 
-proto_code_gen项目里自带的code_templates.json是针对[gserver](https://github.com/fish-tennis/gserver)用的
+proto_code_gen项目里自带的code_templates.json是针对[gserver](https://github.com/fish-tennis/gserver)和[gnet](https://github.com/fish-tennis/gnet)用的
 
 ## 原理
 protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的message结构体上的注释.
