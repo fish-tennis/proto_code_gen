@@ -94,9 +94,9 @@ func sendRes(conn Connection, res *pb.Res) {
 ```
 
 ## 使用proto_code_gen
-编译
+获取
 ```console
-go build
+go get github.com/fish-tennis/proto_code_gen
 ```
 运行
 ```console
