@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -16,7 +15,7 @@ import (
 
 // proto的message的结构信息
 type ProtoMessageStructInfo struct {
-	// *.proto的文件名(不包含.proto)
+	// *.pb.go的文件名
 	protoName   string
 	// message结构名
 	messageName string
@@ -41,21 +40,21 @@ type CodeTemplate struct {
 	OutFile string
 
 	/*
-	package game
-	import "github.com/fish-tennis/gserver/pb"
+		package game
+		import "github.com/fish-tennis/gserver/pb"
 	*/
 	// 文件头,用[]string,为了解决code_templates.json里不方便写换行的问题
 	Header []string
 
 	/*
-	@Player对应的函数模板:
-	func (this *Player) Send{MessageName}(packet *pb.{MessageName}) bool {
-		return this.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
-	}
-	@Server对应的函数模板
-	func SendPacket{MessageName}(conn Connection, packet *pb.{MessageName}) bool {
-		return conn.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
-	}
+		@Player对应的函数模板:
+		func (this *Player) Send{MessageName}(packet *pb.{MessageName}) bool {
+			return this.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
+		}
+		@Server对应的函数模板
+		func SendPacket{MessageName}(conn Connection, packet *pb.{MessageName}) bool {
+			return conn.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
+		}
 	*/
 	// 函数替换模板
 	FuncTemplate []string
@@ -175,7 +174,7 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 					structInfoList = append(structInfoList, structInfo)
 					parserResult.protoMap[structInfo.protoName] = structInfoList
 					keyChecker[comment] = struct{}{}
-					println(fmt.Sprintf("%v KeyComment:%v value:%v", structInfo.messageName, structInfo.keyComment, structInfo.keyCommentValue))
+					println(fmt.Sprintf("%v %v key:%v value:%v", structInfo.protoName, structInfo.messageName, structInfo.keyComment, structInfo.keyCommentValue))
 				}
 			}
 		}
@@ -216,37 +215,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	}
 }
 
-// 生成相应的辅助代码
-func generateCode(parserResult *ParserResult, key string) {
-	codeTemplate := parserResult.GetCodeTemplate(key)
-	builder := strings.Builder{}
-	builder.WriteString(strings.Join(codeTemplate.Header, "\n"))
-	for _,structInfoList := range parserResult.protoMap {
-		for _,structInfo := range structInfoList {
-			if structInfo.keyComment != codeTemplate.KeyComment {
-				continue
-			}
-			protoFileName := structInfo.protoName[:strings.Index(structInfo.protoName,".pb.go")]
-			protoName := protoFileName
-			// 首字母大写
-			ProtoName := strings.ToUpper(protoFileName[:1]) + protoFileName[1:]
-			messageName := structInfo.messageName
-			funcStr := strings.Join(codeTemplate.FuncTemplate, "\n")
-			// 替换掉代码模板中的关键字
-			funcStr = strings.ReplaceAll(funcStr, "{MessageName}", messageName)
-			funcStr = strings.ReplaceAll(funcStr, "{protoName}", protoName)
-			funcStr = strings.ReplaceAll(funcStr, "{ProtoName}", ProtoName)
-			funcStr = strings.ReplaceAll(funcStr, "{PackageName}", structInfo.pbPackageName)
-			funcStr = strings.ReplaceAll(funcStr, "{Value}", structInfo.keyCommentValue)
-			funcStr = strings.ReplaceAll(funcStr, "{Comment}", structInfo.normalComment)
-			builder.WriteString(funcStr)
-			builder.WriteString("\n")
-		}
-	}
-	builder.WriteString(strings.Join(codeTemplate.Tail, "\n"))
-	os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
-}
-
+// 从json文件加载代码模板配置
 func initCodeTemplatesConfig(config string) []*CodeTemplate {
 	fileData,err := os.ReadFile(config)
 	if err != nil {
@@ -258,16 +227,4 @@ func initCodeTemplatesConfig(config string) []*CodeTemplate {
 		panic(err)
 	}
 	return codeTemplates
-}
-
-func main() {
-	var codeTemplatesConfigFile,inputFiles string
-	flag.StringVar(&inputFiles, "input", "", "pattern to match input file(s)")
-	flag.StringVar(&codeTemplatesConfigFile, "config", "", "code template config")
-	flag.Parse()
-
-	if len(inputFiles) == 0 {
-		log.Fatal("no input file")
-	}
-	ParseFiles(inputFiles, codeTemplatesConfigFile)
 }

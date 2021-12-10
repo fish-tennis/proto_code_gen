@@ -18,7 +18,7 @@ option go_package = "/pb";
 enum CmdTest {
     Cmd_None = 0;
     Cmd_Req = 1; // 客户端的请求消息
-	Cmd_Res = 2; // 服务器回复消息
+    Cmd_Res = 2; // 服务器回复消息
 }
 
 // 客户端的请求消息
@@ -96,10 +96,11 @@ func sendRes(conn Connection, res *pb.Res) {
 ## 使用proto_code_gen
 编译
 ```console
-go build protoc_code_gen.go
+go build
 ```
 运行
 ```console
+// windows系统: -input=\\dir\\*.pb.go
 protoc_code_gen -input=/dir/*.pb.go -config=./code_templates.json
 ```
 项目需要根据自己的需求,修改code_templates.json里面的内容,从而生成不同的代码.
@@ -109,10 +110,14 @@ proto_code_gen项目里自带的code_templates.json是针对[gserver](https://gi
 ## 原理
 protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的message结构体上的注释.
 
-如果code_templates.json配置了对应的关键字,则按照代码模板进行相关的文本替换,并自动生成代码文件.
+如果code_templates.json配置了对应的{ReplaceKey}关键字,则按照代码模板进行相关的文本替换,并自动生成代码文件.
 
-可替换的内容:
+目前支持的{ReplaceKey}:
 - {MessageName}: 消息结构体的名字
+- {MESSAGENAME}: TestMessageXyz -> TESTMESSAGEXYZ
+- {MESSAGE_NAME}: TestMessageXyz -> TEST_MESSAGE_XYZ
+- {CamelMessageName}: TEST_MESSAGE_XYZ -> TestMessageXyz
+- {Camel_Message_Name}: TEST_MESSAGE_XYZ -> Test_Message_Xyz
 - {protoName}: proto文件名
 - {ProtoName}: 首字母大写的proto文件名
 - {PackageName}: *.pb.go文件的package名
