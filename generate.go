@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"strings"
 )
@@ -47,4 +48,5 @@ func generateCode(parserResult *ParserResult, key string) {
 	}
 	builder.WriteString(strings.Join(codeTemplate.Tail, "\n"))
 	os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
+	log.Printf("OutFile:%v", codeTemplate.OutFile)
 }

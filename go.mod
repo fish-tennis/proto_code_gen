@@ -1,1 +1,1 @@
-module "proto_code_gen"
+module github.com/fish-tennis/proto_code_gen
