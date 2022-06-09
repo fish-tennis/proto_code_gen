@@ -56,6 +56,10 @@ func generateCode(parserResult *ParserResult, key string) {
 		}
 	}
 	builder.WriteString(strings.Join(codeTemplate.Tail, "\n"))
-	os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
-	log.Printf("OutFile:%v", codeTemplate.OutFile)
+	writeErr := os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
+	if writeErr != nil {
+		log.Printf("write failed:%v %v", codeTemplate.OutFile, writeErr)
+	} else {
+		log.Printf("OutFile:%v", codeTemplate.OutFile)
+	}
 }
