@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -174,7 +173,7 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 					structInfoList = append(structInfoList, structInfo)
 					parserResult.protoMap[structInfo.protoName] = structInfoList
 					keyChecker[comment] = struct{}{}
-					println(fmt.Sprintf("%v %v key:%v value:%v", structInfo.protoName, structInfo.messageName, structInfo.keyComment, structInfo.keyCommentValue))
+					//println(fmt.Sprintf("%v %v key:%v value:%v", structInfo.protoName, structInfo.messageName, structInfo.keyComment, structInfo.keyCommentValue))
 				}
 			}
 		}

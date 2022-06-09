@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -11,7 +12,15 @@ func generateCode(parserResult *ParserResult, key string) {
 	codeTemplate := parserResult.GetCodeTemplate(key)
 	builder := strings.Builder{}
 	builder.WriteString(strings.Join(codeTemplate.Header, "\n"))
+	// 排序一下,避免proto文件没改动,生成的代码文件却不一样
+	var sortProtoList [][]*ProtoMessageStructInfo
 	for _,structInfoList := range parserResult.protoMap {
+		sortProtoList = append(sortProtoList, structInfoList)
+	}
+	sort.Slice(sortProtoList, func(i, j int) bool {
+		return sortProtoList[i][0].protoName < sortProtoList[j][0].protoName
+	})
+	for _,structInfoList := range sortProtoList {
 		for _,structInfo := range structInfoList {
 			if structInfo.keyComment != codeTemplate.KeyComment {
 				continue
