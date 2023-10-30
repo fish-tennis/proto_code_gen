@@ -62,11 +62,32 @@ type CodeTemplate struct {
 	Tail []string
 }
 
-type CodeTemplates []*CodeTemplate
+// Reader代码模板
+type ReaderCodeTemplate struct {
+	// 生成文件名
+	OutFile string
+
+	/*
+		package game
+		import "github.com/fish-tennis/gserver/pb"
+	*/
+	// 文件头,用[]string,为了解决code_templates.json里不方便写换行的问题
+	Header []string
+}
+
+type CodeTemplates struct {
+	Code []*CodeTemplate
+	Reader *ReaderCodeTemplate
+}
 
 type ParserResult struct {
+	// 配置模板
 	codeTemplates []*CodeTemplate
+	readerTemplates *ReaderCodeTemplate
+	// 每个文件对应的有关键字标记的message列表
 	protoMap map[string][]*ProtoMessageStructInfo // key:protoName
+	// 所有的message
+	allProto []*ProtoMessageStructInfo
 }
 
 func (this *ParserResult) GetCodeTemplate(key string) *CodeTemplate {
@@ -119,6 +140,7 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 			continue
 		}
 		//println(fmt.Sprintf("struct doc:%v", genDecl.Doc))
+		var structInfo *ProtoMessageStructInfo
 		// struct的注释在genDecl.Doc里
 		if genDecl.Doc != nil {
 			keyChecker := make(map[string]struct{})
@@ -157,7 +179,7 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 					if _,ok := keyChecker[comment]; ok {
 						continue
 					}
-					structInfo := &ProtoMessageStructInfo{
+					structInfo = &ProtoMessageStructInfo{
 						protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile,"\\","/",-1))),
 						messageName: typeSpec.Name.Name,
 						keyComment:  codeTemplate.KeyComment,
@@ -177,6 +199,23 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 				}
 			}
 		}
+		if structInfo == nil {
+			normalComment := ""
+			for _,v := range genDecl.Doc.List {
+				if normalComment != "" {
+					normalComment += "\n"
+				}
+				normalComment += v.Text
+			}
+			structInfo = &ProtoMessageStructInfo{
+				protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile,"\\","/",-1))),
+				messageName: typeSpec.Name.Name,
+				normalComment: normalComment,
+				pbPackageName: f.Name.Name,
+				structType:  structDecl,
+			}
+		}
+		parserResult.allProto = append(parserResult.allProto, structInfo)
 	}
 }
 
@@ -184,7 +223,8 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	codeTemplates := initCodeTemplatesConfig(codeTemplatesConfig)
 	parserResult := &ParserResult{
-		codeTemplates: codeTemplates,
+		codeTemplates: codeTemplates.Code,
+		readerTemplates: codeTemplates.Reader,
 		protoMap: map[string][]*ProtoMessageStructInfo{},
 	}
 	files, err := filepath.Glob(pbGoFilePattern)
@@ -212,10 +252,11 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	for _,codeTemplate := range parserResult.codeTemplates {
 		generateCode(parserResult, codeTemplate.KeyComment)
 	}
+	generatePbReader(parserResult)
 }
 
 // 从json文件加载代码模板配置
-func initCodeTemplatesConfig(config string) []*CodeTemplate {
+func initCodeTemplatesConfig(config string) *CodeTemplates {
 	fileData,err := os.ReadFile(config)
 	if err != nil {
 		panic("read config file err")
@@ -225,5 +266,5 @@ func initCodeTemplatesConfig(config string) []*CodeTemplate {
 	if err != nil {
 		panic(err)
 	}
-	return codeTemplates
+	return &codeTemplates
 }
