@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"go/ast"
 	"log"
 	"os"
 	"sort"
@@ -14,14 +16,14 @@ func generateCode(parserResult *ParserResult, key string) {
 	builder.WriteString(strings.Join(codeTemplate.Header, "\n"))
 	// 排序一下,避免proto文件没改动,生成的代码文件却不一样
 	var sortProtoList [][]*ProtoMessageStructInfo
-	for _,structInfoList := range parserResult.protoMap {
+	for _, structInfoList := range parserResult.protoMap {
 		sortProtoList = append(sortProtoList, structInfoList)
 	}
 	sort.Slice(sortProtoList, func(i, j int) bool {
 		return sortProtoList[i][0].protoName < sortProtoList[j][0].protoName
 	})
-	for _,structInfoList := range sortProtoList {
-		for _,structInfo := range structInfoList {
+	for _, structInfoList := range sortProtoList {
+		for _, structInfo := range structInfoList {
 			if structInfo.keyComment != codeTemplate.KeyComment {
 				continue
 			}
@@ -38,11 +40,11 @@ func generateCode(parserResult *ParserResult, key string) {
 			// TestMessageXyz -> TESTMESSAGEXYZ
 			funcStr = strings.ReplaceAll(funcStr, "{MESSAGENAME}", strings.ToUpper(messageName))
 			// TestMessageXyz -> TEST_MESSAGE_XYZ
-			funcStr = strings.ReplaceAll(funcStr, "{MESSAGE_NAME}", CamelCaseToUpperWords(messageName,"_"))
+			funcStr = strings.ReplaceAll(funcStr, "{MESSAGE_NAME}", CamelCaseToUpperWords(messageName, "_"))
 			// TEST_MESSAGE_XYZ -> TestMessageXyz
-			funcStr = strings.ReplaceAll(funcStr, "{CamelMessageName}", UpperWordsToCamelCase(messageName,"_", true))
+			funcStr = strings.ReplaceAll(funcStr, "{CamelMessageName}", UpperWordsToCamelCase(messageName, "_", true))
 			// TEST_MESSAGE_XYZ -> Test_Message_Xyz
-			funcStr = strings.ReplaceAll(funcStr, "{Camel_Message_Name}", UpperWordsToCamelCase(messageName,"_", false))
+			funcStr = strings.ReplaceAll(funcStr, "{Camel_Message_Name}", UpperWordsToCamelCase(messageName, "_", false))
 
 			funcStr = strings.ReplaceAll(funcStr, "{protoName}", protoName)
 			// test -> Test
@@ -62,4 +64,149 @@ func generateCode(parserResult *ParserResult, key string) {
 	} else {
 		log.Printf("OutFile:%v", codeTemplate.OutFile)
 	}
+}
+
+func generatePbReader(parserResult *ParserResult) {
+	if parserResult.readerTemplates.OutDir == "" {
+		return
+	}
+	os.Mkdir(parserResult.readerTemplates.OutDir, os.ModePerm)
+	structTemplateStr := `
+type %vReader struct {
+	v *%v
+}
+
+func New%vReader(src *%v) *%vReader {
+	return &%vReader{v:src}
+}
+`
+	fieldTemplateStr := `
+func (r *%vReader) Get%v() %v {
+	return r.v.%v
+}
+`
+	starFieldTemplateStr := `
+func (r *%vReader) Get%v() %v {
+	return *r.v.%v
+}
+`
+	for protoName, structInfoList := range parserResult.allProto {
+		builder := strings.Builder{}
+		builder.WriteString(strings.Join(parserResult.readerTemplates.Header, "\n"))
+		// proto文件是否使用了anypb.Any,自动import相关的lib
+		importAnyPb := hasAnyPbField(structInfoList)
+		if len(parserResult.readerTemplates.Import) > 0 || importAnyPb {
+			builder.WriteString("import (\n")
+			for _,v := range parserResult.readerTemplates.Import {
+				builder.WriteString("\t")
+				builder.WriteString(v)
+				builder.WriteString("\n")
+			}
+			if importAnyPb {
+				builder.WriteString("\t")
+				builder.WriteString("\"google.golang.org/protobuf/types/known/anypb\"")
+				builder.WriteString("\n")
+			}
+			builder.WriteString(")\n")
+		}
+		for _,structInfo := range structInfoList {
+			readerStr := fmt.Sprintf(structTemplateStr,
+				structInfo.messageName,
+				structInfo.messageName,
+				structInfo.messageName,
+				structInfo.messageName,
+				structInfo.messageName,
+				structInfo.messageName,
+			)
+			builder.WriteString(readerStr)
+			builder.WriteString("\n")
+			fieldList := structInfo.structType.Fields
+			for _,field := range fieldList.List {
+				if len(field.Names) == 0 {
+					continue
+				}
+				fieldName := field.Names[0].Name
+				if !ast.IsExported(fieldName) {
+					continue
+				}
+				if parserResult.readerTemplates.ProtoV2 {
+					if fieldName == "XXX_unrecognized" {
+						continue
+					}
+				}
+				fieldNameTypeName := getTypeName(field.Type)
+				if fieldNameTypeName == "" {
+					log.Printf("%v.%v type parse error!", structInfo.messageName, fieldName)
+					continue
+				}
+				realFieldTemplateStr := fieldTemplateStr
+				if parserResult.readerTemplates.ProtoV2 {
+					// proto2的基础类型的引用类型转换成值类型
+					starSimpleTypes := []string{"*int8","*int16","*int32","*int64","*uint8","*uint16","*uint32","*uint64","*string"}
+					for _,v := range starSimpleTypes {
+						if fieldNameTypeName == v {
+							realFieldTemplateStr = starFieldTemplateStr
+							fieldNameTypeName = fieldNameTypeName[1:]
+							break
+						}
+					}
+				}
+				fieldStr := fmt.Sprintf(realFieldTemplateStr,
+					structInfo.messageName,
+					fieldName,
+					fieldNameTypeName,
+					fieldName,
+				)
+				builder.WriteString(fieldStr)
+				builder.WriteString("\n")
+			}
+		}
+		outFileName := fmt.Sprintf("%v/%vReader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
+		writeErr := os.WriteFile(outFileName, ([]byte)(builder.String()), 0644)
+		if writeErr != nil {
+			log.Printf("write failed:%v %v", outFileName, writeErr)
+		} else {
+			log.Printf("OutFile:%v", outFileName)
+		}
+	}
+}
+
+func getTypeName(expr ast.Expr) string {
+	switch typ := expr.(type) {
+	case *ast.Ident:
+		return typ.Name
+	case *ast.StarExpr:
+		return fmt.Sprintf("*%v", getTypeName(typ.X))
+	case *ast.SliceExpr:
+		return fmt.Sprintf("[]%v", getTypeName(typ.X))
+	case *ast.ArrayType:
+		return fmt.Sprintf("[]%v", getTypeName(typ.Elt))
+	case *ast.MapType:
+		return fmt.Sprintf("map[%v]%v", getTypeName(typ.Key), getTypeName(typ.Value))
+	case *ast.SelectorExpr:
+		return fmt.Sprintf("%v.%v", getTypeName(typ.X), typ.Sel.Name)
+	default:
+		log.Printf("unsupport type:%v", typ)
+	}
+	return ""
+}
+
+func hasAnyPbField(structInfoList []*ProtoMessageStructInfo) bool {
+	for _,structInfo := range structInfoList {
+		fieldList := structInfo.structType.Fields
+		for _,field := range fieldList.List {
+			if len(field.Names) == 0 {
+				continue
+			}
+			fieldName := field.Names[0].Name
+			if !ast.IsExported(fieldName) {
+				continue
+			}
+			fieldNameTypeName := getTypeName(field.Type)
+			if strings.HasSuffix(fieldNameTypeName, "anypb.Any") {
+				return true
+			}
+		}
+	}
+	return false
 }
