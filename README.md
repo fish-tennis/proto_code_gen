@@ -124,5 +124,10 @@ protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的messag
 - {Value}: 注释里可以加一个Value值,如@Player:TheValue
 - {Comment}: message的注释(排除了@key)
 
+## 只读接口
+某些应用场景,会使用protobuf的结构来当作配置数据的格式,proto_code_gen提供了一种生成protobuf只读接口的功能,类似c++中的const.
+
+设置code_templates.json中Reader.OutDir为有效的目录,运行proto_code_gen会生成相应的只读接口
+
 ## 参考
 [protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag)
