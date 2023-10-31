@@ -70,6 +70,7 @@ func generatePbReader(parserResult *ParserResult) {
 	if parserResult.readerTemplates.OutDir == "" {
 		return
 	}
+	log.Printf("generatePbReader:%v", parserResult.readerTemplates.OutDir)
 	os.Mkdir(parserResult.readerTemplates.OutDir, os.ModePerm)
 	structTemplateStr := `
 type %vReader struct {
@@ -161,12 +162,12 @@ func (r *%vReader) Get%v() %v {
 				builder.WriteString("\n")
 			}
 		}
-		outFileName := fmt.Sprintf("%v/%vReader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
+		outFileName := fmt.Sprintf("%v/%v_reader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
 		writeErr := os.WriteFile(outFileName, ([]byte)(builder.String()), 0644)
 		if writeErr != nil {
 			log.Printf("write failed:%v %v", outFileName, writeErr)
 		} else {
-			log.Printf("OutFile:%v", outFileName)
+			//log.Printf("OutFile:%v", outFileName)
 		}
 	}
 }
