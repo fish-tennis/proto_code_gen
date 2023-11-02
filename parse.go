@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -67,6 +68,12 @@ type ReaderCodeTemplate struct {
 	// 生成目录
 	OutDir string
 
+	// 处理哪些文件,支持正则
+	FileFilter []string
+
+	// 处理哪些message,支持正则
+	MessageFilter []string
+
 	/*
 		package game
 		import "github.com/fish-tennis/gserver/pb"
@@ -79,6 +86,24 @@ type ReaderCodeTemplate struct {
 
 	// 是否使用proto2
 	ProtoV2 bool
+}
+
+func (this *ReaderCodeTemplate) MatchFile(fileName string) bool {
+	for _,filter := range this.FileFilter {
+		if ok,_ := regexp.MatchString(filter, fileName); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
+	for _,filter := range this.MessageFilter {
+		if ok,_ := regexp.MatchString(filter, messageName); ok {
+			return true
+		}
+	}
+	return false
 }
 
 type CodeTemplates struct {

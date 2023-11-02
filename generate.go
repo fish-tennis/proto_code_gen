@@ -67,10 +67,12 @@ func generateCode(parserResult *ParserResult, key string) {
 }
 
 func generatePbReader(parserResult *ParserResult) {
-	if parserResult.readerTemplates.OutDir == "" {
+	readerConfig := parserResult.readerTemplates
+	if readerConfig.OutDir == "" && len(readerConfig.FileFilter) == 0 && len(readerConfig.MessageFilter) == 0 {
 		return
 	}
-	log.Printf("generatePbReader:%v", parserResult.readerTemplates.OutDir)
+	log.Printf("generatePbReader:%v files:%v messages:%v", parserResult.readerTemplates.OutDir,
+		readerConfig.FileFilter, readerConfig.MessageFilter)
 	os.Mkdir(parserResult.readerTemplates.OutDir, os.ModePerm)
 	structTemplateStr := `
 type %vReader struct {
@@ -92,6 +94,7 @@ func (r *%vReader) Get%v() %v {
 }
 `
 	for protoName, structInfoList := range parserResult.allProto {
+		wholeFileMatch := len(readerConfig.FileFilter) > 0 && readerConfig.MatchFile(protoName)
 		builder := strings.Builder{}
 		builder.WriteString(strings.Join(parserResult.readerTemplates.Header, "\n"))
 		// proto文件是否使用了anypb.Any,自动import相关的lib
@@ -110,7 +113,13 @@ func (r *%vReader) Get%v() %v {
 			}
 			builder.WriteString(")\n")
 		}
+		outMessageCount := 0
 		for _,structInfo := range structInfoList {
+			if !wholeFileMatch {
+				if len(readerConfig.MessageFilter) == 0 || !readerConfig.MatchMessage(structInfo.messageName) {
+					continue
+				}
+			}
 			readerStr := fmt.Sprintf(structTemplateStr,
 				structInfo.messageName,
 				structInfo.messageName,
@@ -161,13 +170,18 @@ func (r *%vReader) Get%v() %v {
 				builder.WriteString(fieldStr)
 				builder.WriteString("\n")
 			}
+			outMessageCount++
 		}
 		outFileName := fmt.Sprintf("%v/%v_reader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
-		writeErr := os.WriteFile(outFileName, ([]byte)(builder.String()), 0644)
-		if writeErr != nil {
-			log.Printf("write failed:%v %v", outFileName, writeErr)
+		if outMessageCount > 0 {
+			writeErr := os.WriteFile(outFileName, ([]byte)(builder.String()), 0644)
+			if writeErr != nil {
+				log.Printf("write failed:%v %v", outFileName, writeErr)
+			} else {
+				log.Printf("OutFile:%v", outFileName)
+			}
 		} else {
-			//log.Printf("OutFile:%v", outFileName)
+			os.Remove(outFileName)
 		}
 	}
 }
