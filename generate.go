@@ -74,25 +74,60 @@ func generatePbReader(parserResult *ParserResult) {
 	log.Printf("generatePbReader:%v files:%v messages:%v", parserResult.readerTemplates.OutDir,
 		readerConfig.FileFilter, readerConfig.MessageFilter)
 	os.Mkdir(parserResult.readerTemplates.OutDir, os.ModePerm)
+
+	// xxxReader模板
 	structTemplateStr := `
-type %vReader struct {
-	v *%v
+type {MessageName}Reader struct {
+	v *{MessageName}
 }
 
-func New%vReader(src *%v) *%vReader {
-	return &%vReader{v:src}
+func New{MessageName}Reader(src *{MessageName}) *{MessageName}Reader {
+	return &{MessageName}Reader{v:src}
 }
 `
+
+	// 普通字段模板
 	fieldTemplateStr := `
-func (r *%vReader) Get%v() %v {
-	return r.v.%v
+func (r *{MessageName}Reader) Get{FieldName}() {FieldType} {
+	return r.v.Get{FieldName}()
 }
 `
+
+	// proto2的星号字段模板
 	starFieldTemplateStr := `
-func (r *%vReader) Get%v() %v {
-	return *r.v.%v
+func (r *{MessageName}Reader) Get{FieldName}() {FieldType}Reader {
+	return New{FieldTypeNoStar}Reader(r.v.Get{FieldName}())
 }
 `
+
+	// 基础类型数组字段模板
+	genericSliceFieldTemplateStr := `
+func (r *{MessageName}Reader) Get{FieldName}() []{FieldType} {
+	src := r.v.Get{FieldName}()
+	if src == nil {
+		return nil
+	}
+	copySlice := make([]{FieldType},len(src))
+	copy(copySlice, src)
+	return copySlice
+}
+`
+
+	// 星号数组字段模板
+	starSliceFieldTemplateStr := `
+func (r *{MessageName}Reader) Get{FieldName}() []{FieldType}Reader {
+	src := r.v.Get{FieldName}()
+	if src == nil {
+		return nil
+	}
+	sliceReader := make([]{FieldType}Reader,len(src))
+	for i,v := range src {
+		sliceReader[i] = New{FieldTypeNoStar}Reader(v)
+	}
+	return sliceReader
+}
+`
+
 	for protoName, structInfoList := range parserResult.allProto {
 		wholeFileMatch := len(readerConfig.FileFilter) > 0 && readerConfig.MatchFile(protoName)
 		builder := strings.Builder{}
@@ -120,14 +155,7 @@ func (r *%vReader) Get%v() %v {
 					continue
 				}
 			}
-			readerStr := fmt.Sprintf(structTemplateStr,
-				structInfo.messageName,
-				structInfo.messageName,
-				structInfo.messageName,
-				structInfo.messageName,
-				structInfo.messageName,
-				structInfo.messageName,
-			)
+			readerStr := strings.ReplaceAll(structTemplateStr, "{MessageName}", structInfo.messageName)
 			builder.WriteString(readerStr)
 			builder.WriteString("\n")
 			fieldList := structInfo.structType.Fields
@@ -149,26 +177,48 @@ func (r *%vReader) Get%v() %v {
 					log.Printf("%v.%v type parse error!", structInfo.messageName, fieldName)
 					continue
 				}
-				realFieldTemplateStr := fieldTemplateStr
+				isStarField := isStar(field.Type)
 				if parserResult.readerTemplates.ProtoV2 {
 					// proto2的基础类型的引用类型转换成值类型
-					starSimpleTypes := []string{"*int8","*int16","*int32","*int64","*uint8","*uint16","*uint32","*uint64","*string"}
-					for _,v := range starSimpleTypes {
-						if fieldNameTypeName == v {
-							realFieldTemplateStr = starFieldTemplateStr
-							fieldNameTypeName = fieldNameTypeName[1:]
-							break
-						}
+					if isGenericTypeName(fieldNameTypeName, true) {
+						isStarField = false
+						fieldNameTypeName = fieldNameTypeName[1:]
 					}
 				}
-				fieldStr := fmt.Sprintf(realFieldTemplateStr,
-					structInfo.messageName,
-					fieldName,
-					fieldNameTypeName,
-					fieldName,
-				)
+				fieldStr := ""
+				if isGenericSlice(field.Type) {
+					elemTypeName := getElemTypeName(field.Type)
+					fieldStr = strings.ReplaceAll(genericSliceFieldTemplateStr, "{MessageName}", structInfo.messageName)
+					fieldStr = strings.ReplaceAll(fieldStr, "{FieldName}", fieldName)
+					fieldStr = strings.ReplaceAll(fieldStr, "{FieldType}", elemTypeName)
+				} else if isStarSlice(field.Type) {
+					elemTypeName := getElemTypeName(field.Type)
+					fieldStr = strings.ReplaceAll(starSliceFieldTemplateStr, "{MessageName}", structInfo.messageName)
+					fieldStr = strings.ReplaceAll(fieldStr, "{FieldName}", fieldName)
+					fieldStr = strings.ReplaceAll(fieldStr, "{FieldType}", elemTypeName)
+					if elemTypeName[0] == '*' {
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldTypeNoStar}", elemTypeName[1:])
+					} else {
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldTypeNoStar}", elemTypeName)
+					}
+					// TODO: map[k]v的特殊处理
+				} else {
+					if isStarField {
+						fieldStr = strings.ReplaceAll(starFieldTemplateStr, "{MessageName}", structInfo.messageName)
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldName}", fieldName)
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldType}", fieldNameTypeName)
+						if fieldNameTypeName[0] == '*' {
+							fieldStr = strings.ReplaceAll(fieldStr, "{FieldTypeNoStar}", fieldNameTypeName[1:])
+						} else {
+							fieldStr = strings.ReplaceAll(fieldStr, "{FieldTypeNoStar}", fieldNameTypeName)
+						}
+					} else {
+						fieldStr = strings.ReplaceAll(fieldTemplateStr, "{MessageName}", structInfo.messageName)
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldName}", fieldName)
+						fieldStr = strings.ReplaceAll(fieldStr, "{FieldType}", fieldNameTypeName)
+					}
+				}
 				builder.WriteString(fieldStr)
-				builder.WriteString("\n")
 			}
 			outMessageCount++
 		}
@@ -186,6 +236,24 @@ func (r *%vReader) Get%v() %v {
 	}
 }
 
+// 是否是基础类型(bool int uint float string)
+func isGenericTypeName(typeName string, isStar bool) bool {
+	genericTypes := []string{"bool","int8","int16","int32","int64","uint8","uint16","uint32","uint64","float32","float64","string"}
+	for _,v := range genericTypes {
+		if isStar {
+			if typeName == fmt.Sprintf("*%v", v) {
+				return true
+			}
+		} else {
+			if typeName == v {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// 类型string
 func getTypeName(expr ast.Expr) string {
 	switch typ := expr.(type) {
 	case *ast.Ident:
@@ -206,6 +274,49 @@ func getTypeName(expr ast.Expr) string {
 	return ""
 }
 
+// 是否是[]*xxx格式的数组
+func isStarSlice(expr ast.Expr) bool {
+	switch typ := expr.(type) {
+	case *ast.SliceExpr:
+		return isStar(typ.X)
+	case *ast.ArrayType:
+		return isStar(typ.Elt)
+	}
+	return false
+}
+
+// 是否是星号字段
+func isStar(expr ast.Expr) bool {
+	switch expr.(type) {
+	case *ast.StarExpr:
+		return true
+	}
+	return false
+}
+
+// 是否是基础类型的数组([]int []string)
+func isGenericSlice(expr ast.Expr) bool {
+	switch typ := expr.(type) {
+	case *ast.SliceExpr:
+		return isGenericTypeName(getTypeName(typ.X), false)
+	case *ast.ArrayType:
+		return isGenericTypeName(getTypeName(typ.Elt), false)
+	}
+	return false
+}
+
+// slice的elem类型
+func getElemTypeName(expr ast.Expr) string {
+	switch typ := expr.(type) {
+	case *ast.SliceExpr:
+		return getTypeName(typ.X)
+	case *ast.ArrayType:
+		return getTypeName(typ.Elt)
+	}
+	return ""
+}
+
+// 是否有anypb.Any类型的字段
 func hasAnyPbField(structInfoList []*ProtoMessageStructInfo) bool {
 	for _,structInfo := range structInfoList {
 		fieldList := structInfo.structType.Fields
