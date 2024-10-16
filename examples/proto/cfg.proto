@@ -6,11 +6,28 @@ option go_package = "/pb";
 // 测试message's struct tag
 // @StructTagOfExample
 message Example {
-  int32 Field1 = 1;
-  string Field2 = 2;
+  int32 Int32Field = 1;
+  string StringField = 2;
+  float FloatField = 3;
+  repeated int32 Int32Slice = 4;
+  repeated string StringSlice = 5;
+  Child SingleChild = 6;
+  repeated Child Children = 7;
+}
+
+// 测试message's struct tag with value
+// @StructTagOfExample:testValue
+message Example2 {
+  int32 Int32Field = 1;
+  string StringField = 2;
 }
 
 message ExampleWithoutTag {
-  int32 Field1 = 1;
-  string Field2 = 2;
+  int32 Int32Field = 1;
+  string StringField = 2;
+}
+
+message Child {
+  int32 Int32Field = 1;
+  string StringField = 2;
 }

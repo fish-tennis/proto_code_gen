@@ -16,19 +16,33 @@ import (
 // proto的message的结构信息
 type ProtoMessageStructInfo struct {
 	// *.pb.go的文件名
-	protoName   string
+	protoName string
 	// message结构名
-	messageName string
+	MessageName string
 	// 注释关键字
-	keyComment  string
+	keyComment string
 	// 注释关键字可以对应一个值
-	keyCommentValue string
+	Value string
 	// 排除keyComment后的注释
-	normalComment string
+	Comment string
 	// *pb.go的package name
-	pbPackageName string
+	PackageName string
 	// message的结构信息
-	structType  *ast.StructType
+	structType *ast.StructType
+
+	Fields []*ReaderField
+}
+
+type ReaderField struct {
+	FieldName string
+	FieldType string
+	// 如果是Pointer,移除前面的星号(如 *string -> string)
+	FieldTypeWithoutPtr string
+	// slice的elem类型名(移除了前面的星号)
+	ElemTypeName  string
+	IsStruct      bool // 子message,如 *Item
+	IsNormalSlice bool // 普通slice,如[]int32
+	IsPtrSlice    bool // pointer slice, 如[]*Item
 }
 
 // 代码模板
@@ -36,35 +50,18 @@ type CodeTemplate struct {
 	// 注释关键字,如@Player
 	KeyComment string
 
+	// 模板文件
+	Template string
+
 	// 生成文件名
 	OutFile string
-
-	/*
-		package game
-		import "github.com/fish-tennis/gserver/pb"
-	*/
-	// 文件头,用[]string,为了解决code_templates.json里不方便写换行的问题
-	Header []string
-
-	/*
-		@Player对应的函数模板:
-		func (this *Player) Send{MessageName}(packet *pb.{MessageName}) bool {
-			return this.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
-		}
-		@Server对应的函数模板
-		func SendPacket{MessageName}(conn Connection, packet *pb.{MessageName}) bool {
-			return conn.Send(Cmd(pb.Cmd{ProtoFileName}_Cmd_{MessageName}), packet)
-		}
-	*/
-	// 函数替换模板
-	FuncTemplate []string
-
-	// 文件尾
-	Tail []string
 }
 
 // Reader代码模板
 type ReaderCodeTemplate struct {
+	// 模板文件
+	Template string
+
 	// 生成目录
 	OutDir string
 
@@ -74,23 +71,13 @@ type ReaderCodeTemplate struct {
 	// 处理哪些message,支持正则
 	MessageFilter []string
 
-	/*
-		package game
-		import "github.com/fish-tennis/gserver/pb"
-	*/
-	// 文件头,用[]string,为了解决code_templates.json里不方便写换行的问题
-	Header []string
-
-	// import列表
-	Import []string
-
 	// 是否使用proto2
 	ProtoV2 bool
 }
 
 func (this *ReaderCodeTemplate) MatchFile(fileName string) bool {
-	for _,filter := range this.FileFilter {
-		if ok,_ := regexp.MatchString(filter, fileName); ok {
+	for _, filter := range this.FileFilter {
+		if ok, _ := regexp.MatchString(filter, fileName); ok {
 			return true
 		}
 	}
@@ -98,8 +85,8 @@ func (this *ReaderCodeTemplate) MatchFile(fileName string) bool {
 }
 
 func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
-	for _,filter := range this.MessageFilter {
-		if ok,_ := regexp.MatchString(filter, messageName); ok {
+	for _, filter := range this.MessageFilter {
+		if ok, _ := regexp.MatchString(filter, messageName); ok {
 			return true
 		}
 	}
@@ -107,13 +94,13 @@ func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
 }
 
 type CodeTemplates struct {
-	Code []*CodeTemplate
+	Code   []*CodeTemplate
 	Reader *ReaderCodeTemplate
 }
 
 type ParserResult struct {
 	// 配置模板
-	codeTemplates []*CodeTemplate
+	codeTemplates   []*CodeTemplate
 	readerTemplates *ReaderCodeTemplate
 	// 每个文件对应的有关键字标记的message列表
 	protoMap map[string][]*ProtoMessageStructInfo // key:protoName
@@ -122,7 +109,7 @@ type ParserResult struct {
 }
 
 func (this *ParserResult) GetCodeTemplate(key string) *CodeTemplate {
-	for _,v := range this.codeTemplates {
+	for _, v := range this.codeTemplates {
 		if v.KeyComment == key {
 			return v
 		}
@@ -175,27 +162,27 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 		// struct的注释在genDecl.Doc里
 		if genDecl.Doc != nil {
 			keyChecker := make(map[string]struct{})
-			for i,structComment := range genDecl.Doc.List {
+			for i, structComment := range genDecl.Doc.List {
 				comment := strings.TrimPrefix(structComment.Text, "//")
 				comment = strings.TrimSpace(comment)
 				commentValue := ""
 				normalComment := ""
 				var codeTemplate *CodeTemplate
-				for _,template := range parserResult.codeTemplates {
+				for _, template := range parserResult.codeTemplates {
 					lowerComment := strings.ToLower(comment)
 					lowerKey := strings.ToLower(template.KeyComment)
 					// 不区分大小写
 					if lowerComment == lowerKey {
 						codeTemplate = template
-					} else if strings.HasPrefix(lowerComment, lowerKey) && strings.Contains(lowerComment,":") {
-						kv := strings.Split(comment,":")
+					} else if strings.HasPrefix(lowerComment, lowerKey) && strings.Contains(lowerComment, ":") {
+						kv := strings.Split(comment, ":")
 						if len(kv) == 2 && kv[1] != "" {
 							codeTemplate = template
 							commentValue = strings.TrimSpace(kv[1])
 						}
 					}
 					if codeTemplate != nil && normalComment == "" {
-						for j,v := range genDecl.Doc.List {
+						for j, v := range genDecl.Doc.List {
 							if j != i {
 								if normalComment != "" {
 									normalComment += "\n"
@@ -208,16 +195,16 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 				// 只处理设置了关键字的
 				if codeTemplate != nil {
 					// 排重
-					if _,ok := keyChecker[comment]; ok {
+					if _, ok := keyChecker[comment]; ok {
 						continue
 					}
 					structInfo = &ProtoMessageStructInfo{
-						protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile,"\\","/",-1))),
-						messageName: typeSpec.Name.Name,
+						protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile, "\\", "/", -1))),
+						MessageName: typeSpec.Name.Name,
 						keyComment:  codeTemplate.KeyComment,
-						keyCommentValue: commentValue,
-						normalComment: normalComment,
-						pbPackageName: f.Name.Name,
+						Value:       commentValue,
+						Comment:     normalComment,
+						PackageName: f.Name.Name,
 						structType:  structDecl,
 					}
 					structInfoList := parserResult.protoMap[structInfo.protoName]
@@ -227,14 +214,14 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 					structInfoList = append(structInfoList, structInfo)
 					parserResult.protoMap[structInfo.protoName] = structInfoList
 					keyChecker[comment] = struct{}{}
-					//println(fmt.Sprintf("%v %v key:%v value:%v", structInfo.protoName, structInfo.messageName, structInfo.keyComment, structInfo.keyCommentValue))
+					//println(fmt.Sprintf("%v %v key:%v value:%v", structInfo.protoName, structInfo.MessageName, structInfo.keyComment, structInfo.Value))
 				}
 			}
 		}
 		if structInfo == nil {
 			normalComment := ""
 			if genDecl.Doc != nil {
-				for _,v := range genDecl.Doc.List {
+				for _, v := range genDecl.Doc.List {
 					if normalComment != "" {
 						normalComment += "\n"
 					}
@@ -242,10 +229,10 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 				}
 			}
 			structInfo = &ProtoMessageStructInfo{
-				protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile,"\\","/",-1))),
-				messageName: typeSpec.Name.Name,
-				normalComment: normalComment,
-				pbPackageName: f.Name.Name,
+				protoName:   path.Base(path.Clean(strings.Replace(protoCodeFile, "\\", "/", -1))),
+				MessageName: typeSpec.Name.Name,
+				Comment:     normalComment,
+				PackageName: f.Name.Name,
 				structType:  structDecl,
 			}
 		}
@@ -262,10 +249,10 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	codeTemplates := initCodeTemplatesConfig(codeTemplatesConfig)
 	parserResult := &ParserResult{
-		codeTemplates: codeTemplates.Code,
+		codeTemplates:   codeTemplates.Code,
 		readerTemplates: codeTemplates.Reader,
-		protoMap: map[string][]*ProtoMessageStructInfo{},
-		allProto: map[string][]*ProtoMessageStructInfo{},
+		protoMap:        map[string][]*ProtoMessageStructInfo{},
+		allProto:        map[string][]*ProtoMessageStructInfo{},
 	}
 	files, err := filepath.Glob(pbGoFilePattern)
 	if err != nil {
@@ -289,7 +276,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 
 		ParseProtoCode(path, parserResult)
 	}
-	for _,codeTemplate := range parserResult.codeTemplates {
+	for _, codeTemplate := range parserResult.codeTemplates {
 		generateCode(parserResult, codeTemplate.KeyComment)
 	}
 	generatePbReader(parserResult)
@@ -297,7 +284,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 
 // 从json文件加载代码模板配置
 func initCodeTemplatesConfig(config string) *CodeTemplates {
-	fileData,err := os.ReadFile(config)
+	fileData, err := os.ReadFile(config)
 	if err != nil {
 		panic("read config file err")
 	}
