@@ -7,7 +7,7 @@
 
 proto_code_gen提供了一种给message增加类似struct tag的方式
 
-## 应用场景1:使用proto_code_gen可以生成的辅助代码
+## 应用场景1:使用proto_code_gen可以生成模板代码
 Step1: 在proto文件中,使用自定义tag,如@StructTagOfExample
 ```proto
 // file: examples/proto/cfg.proto
