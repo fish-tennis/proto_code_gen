@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"log"
 	"os"
+	"path"
 	"sort"
 	"strings"
 )
@@ -58,6 +59,7 @@ func generateCode(parserResult *ParserResult, key string) {
 		}
 	}
 	builder.WriteString(strings.Join(codeTemplate.Tail, "\n"))
+	os.Mkdir(path.Dir(codeTemplate.OutFile), os.ModePerm)
 	writeErr := os.WriteFile(codeTemplate.OutFile, ([]byte)(builder.String()), 0644)
 	if writeErr != nil {
 		log.Printf("write failed:%v %v", codeTemplate.OutFile, writeErr)

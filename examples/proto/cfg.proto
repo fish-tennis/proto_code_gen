@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package pb;
+option go_package = "/pb";
+
+// 测试message's struct tag
+// @StructTagOfExample
+message Example {
+  int32 Field1 = 1;
+  string Field2 = 2;
+}
+
+message ExampleWithoutTag {
+  int32 Field1 = 1;
+  string Field2 = 2;
+}
