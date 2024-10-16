@@ -84,6 +84,10 @@ type {MessageName}Reader struct {
 func New{MessageName}Reader(src *{MessageName}) *{MessageName}Reader {
 	return &{MessageName}Reader{v:src}
 }
+
+func (r *{MessageName}Reader) Raw() *{MessageName} {
+	return r.v
+}
 `
 
 	// 普通字段模板
@@ -136,7 +140,7 @@ func (r *{MessageName}Reader) Get{FieldName}() []{FieldType}Reader {
 		importAnyPb := hasAnyPbField(structInfoList)
 		if len(parserResult.readerTemplates.Import) > 0 || importAnyPb {
 			builder.WriteString("import (\n")
-			for _,v := range parserResult.readerTemplates.Import {
+			for _, v := range parserResult.readerTemplates.Import {
 				builder.WriteString("\t")
 				builder.WriteString(v)
 				builder.WriteString("\n")
@@ -149,7 +153,7 @@ func (r *{MessageName}Reader) Get{FieldName}() []{FieldType}Reader {
 			builder.WriteString(")\n")
 		}
 		outMessageCount := 0
-		for _,structInfo := range structInfoList {
+		for _, structInfo := range structInfoList {
 			if !wholeFileMatch {
 				if len(readerConfig.MessageFilter) == 0 || !readerConfig.MatchMessage(structInfo.messageName) {
 					continue
@@ -159,7 +163,7 @@ func (r *{MessageName}Reader) Get{FieldName}() []{FieldType}Reader {
 			builder.WriteString(readerStr)
 			builder.WriteString("\n")
 			fieldList := structInfo.structType.Fields
-			for _,field := range fieldList.List {
+			for _, field := range fieldList.List {
 				if len(field.Names) == 0 {
 					continue
 				}
@@ -238,8 +242,8 @@ func (r *{MessageName}Reader) Get{FieldName}() []{FieldType}Reader {
 
 // 是否是基础类型(bool int uint float string)
 func isGenericTypeName(typeName string, isStar bool) bool {
-	genericTypes := []string{"bool","int8","int16","int32","int64","uint8","uint16","uint32","uint64","float32","float64","string"}
-	for _,v := range genericTypes {
+	genericTypes := []string{"bool", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "float32", "float64", "string"}
+	for _, v := range genericTypes {
 		if isStar {
 			if typeName == fmt.Sprintf("*%v", v) {
 				return true
@@ -318,9 +322,9 @@ func getElemTypeName(expr ast.Expr) string {
 
 // 是否有anypb.Any类型的字段
 func hasAnyPbField(structInfoList []*ProtoMessageStructInfo) bool {
-	for _,structInfo := range structInfoList {
+	for _, structInfo := range structInfoList {
 		fieldList := structInfo.structType.Fields
-		for _,field := range fieldList.List {
+		for _, field := range fieldList.List {
 			if len(field.Names) == 0 {
 				continue
 			}
