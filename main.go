@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 )
 
 func main() {
-	var codeTemplatesConfigFile,inputFiles string
+	var codeTemplatesConfigFile, inputFiles string
 	flag.StringVar(&inputFiles, "input", "", "pattern to match input *.pb.go file(s)")
 	flag.StringVar(&codeTemplatesConfigFile, "config", "code_templates.json", "code template config")
 	flag.Parse()
@@ -18,5 +19,10 @@ func main() {
 	if len(codeTemplatesConfigFile) == 0 {
 		log.Fatal("no config file")
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal("Getwd error")
+	}
+	log.Printf("cwd:%v", cwd)
 	ParseFiles(inputFiles, codeTemplatesConfigFile)
 }

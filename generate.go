@@ -31,6 +31,10 @@ func generateCode(parserResult *ParserResult, key string) {
 			messageList = append(messageList, structInfo)
 		}
 	}
+	if len(messageList) == 0 {
+		os.Remove(codeTemplate.OutFile)
+		return
+	}
 	tmpl, err := template.ParseFiles(codeTemplate.Template)
 	if err != nil {
 		log.Printf("parse Template file failed:%v %v", codeTemplate.Template, err)
@@ -41,7 +45,7 @@ func generateCode(parserResult *ParserResult, key string) {
 		log.Printf("create dir failed:%v %v", path.Dir(codeTemplate.OutFile), err)
 		return
 	}
-	outFile, err := os.OpenFile(codeTemplate.OutFile, os.O_CREATE|os.O_TRUNC, 0644)
+	outFile, err := os.OpenFile(codeTemplate.OutFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		log.Printf("open OutFile failed:%v %v", codeTemplate.OutFile, err)
 		return
@@ -54,6 +58,7 @@ func generateCode(parserResult *ParserResult, key string) {
 		log.Printf("Execute Template failed:%v %v", codeTemplate.OutFile, err)
 		return
 	}
+	log.Printf("generate code:%v messageCount:%v", codeTemplate.OutFile, len(messageList))
 }
 
 func generatePbReader(parserResult *ParserResult) {
@@ -64,15 +69,17 @@ func generatePbReader(parserResult *ParserResult) {
 	log.Printf("generatePbReader:%v files:%v messages:%v", parserResult.readerTemplates.OutDir,
 		readerConfig.FileFilter, readerConfig.MessageFilter)
 	os.Mkdir(parserResult.readerTemplates.OutDir, os.ModePerm)
+	tmpl, err := template.ParseFiles(readerConfig.Template)
+	if err != nil {
+		log.Printf("parse Template file failed:%v %v", readerConfig.Template, err)
+		return
+	}
+	generateFileCount := 0
+	generateMessageCount := 0
 	for protoName, structInfoList := range parserResult.allProto {
 		wholeFileMatch := len(readerConfig.FileFilter) > 0 && readerConfig.MatchFile(protoName)
 		// proto文件是否使用了anypb.Any,自动import相关的lib
 		importAnyPb := hasAnyPbField(structInfoList)
-		tmpl, err := template.ParseFiles(readerConfig.Template)
-		if err != nil {
-			log.Printf("parse Template file failed:%v %v", readerConfig.Template, err)
-			return
-		}
 		var messageList []*ProtoMessageStructInfo
 		outMessageCount := 0
 		for _, structInfo := range structInfoList {
@@ -144,7 +151,7 @@ func generatePbReader(parserResult *ParserResult) {
 				log.Printf("create dir failed:%v %v", path.Dir(outFileName), err)
 				return
 			}
-			outFile, err := os.OpenFile(outFileName, os.O_CREATE|os.O_TRUNC, 0644)
+			outFile, err := os.OpenFile(outFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
 			if err != nil {
 				log.Printf("open OutFile failed:%v %v", outFileName, err)
 				return
@@ -158,10 +165,13 @@ func generatePbReader(parserResult *ParserResult) {
 				log.Printf("Execute Template failed:%v %v", outFileName, err)
 				return
 			}
+			generateFileCount++
+			generateMessageCount += outMessageCount
 		} else {
 			os.Remove(outFileName)
 		}
 	}
+	log.Printf("generate reader fileCount:%v messageCount:%v", generateFileCount, generateMessageCount)
 }
 
 // 是否是基础类型(bool int uint float string)
