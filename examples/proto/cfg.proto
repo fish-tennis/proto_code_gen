@@ -12,7 +12,9 @@ message Example {
   repeated int32 Int32Slice = 4;
   repeated string StringSlice = 5;
   Child SingleChild = 6;
-  repeated Child Children = 7;
+  repeated Child ChildSlice = 7;
+  map<int32,string> NormalMap = 8;
+  map<string,Child> ChildMap = 9;
 }
 
 // 测试message's struct tag with value

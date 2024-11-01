@@ -38,11 +38,14 @@ type ReaderField struct {
 	FieldType string
 	// 如果是Pointer,移除前面的星号(如 *string -> string)
 	FieldTypeWithoutPtr string
-	// slice的elem类型名(移除了前面的星号)
-	ElemTypeName  string
-	IsStruct      bool // 子message,如 *Item
-	IsNormalSlice bool // 普通slice,如[]int32
-	IsPtrSlice    bool // pointer slice, 如[]*Item
+	// slice和map的elem类型名(移除了前面的星号)
+	ElemTypeName   string
+	MapKeyTypeName string
+	IsStruct       bool // 子message,如 *Item
+	IsNormalSlice  bool // 普通slice,如[]int32
+	IsPtrSlice     bool // pointer slice, 如[]*Item
+	IsNormalMap    bool // 普通map,如map[string]int32
+	IsPtrMap       bool // pointer map,如map[int32]*Item
 }
 
 // 代码模板

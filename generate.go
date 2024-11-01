@@ -111,7 +111,7 @@ func generatePbReader(parserResult *ParserResult) {
 				isStarField := isStar(field.Type)
 				if parserResult.readerTemplates.ProtoV2 {
 					// proto2的基础类型的引用类型转换成值类型
-					if isGenericTypeName(fieldNameTypeName, true) {
+					if isBaseTypeName(fieldNameTypeName, true) {
 						isStarField = false
 						fieldNameTypeName = fieldNameTypeName[1:]
 					}
@@ -120,7 +120,7 @@ func generatePbReader(parserResult *ParserResult) {
 					FieldName: fieldName,
 					FieldType: fieldNameTypeName,
 				}
-				if isGenericSlice(field.Type) {
+				if isNormalSlice(field.Type) {
 					elemTypeName := getElemTypeName(field.Type)
 					readerField.IsNormalSlice = true
 					readerField.ElemTypeName = elemTypeName
@@ -131,7 +131,19 @@ func generatePbReader(parserResult *ParserResult) {
 					}
 					readerField.IsPtrSlice = true
 					readerField.ElemTypeName = elemTypeName
-					// TODO: map[k]v的特殊处理
+				} else if isNormalMap(field.Type) {
+					elemTypeName := getElemTypeName(field.Type)
+					readerField.IsNormalMap = true
+					readerField.MapKeyTypeName = getKeyTypeName(field.Type)
+					readerField.ElemTypeName = elemTypeName
+				} else if isStarMap(field.Type) {
+					elemTypeName := getElemTypeName(field.Type)
+					if elemTypeName[0] == '*' {
+						elemTypeName = elemTypeName[1:]
+					}
+					readerField.IsPtrMap = true
+					readerField.MapKeyTypeName = getKeyTypeName(field.Type)
+					readerField.ElemTypeName = elemTypeName
 				} else {
 					if isStarField {
 						if fieldNameTypeName[0] == '*' {
@@ -175,7 +187,7 @@ func generatePbReader(parserResult *ParserResult) {
 }
 
 // 是否是基础类型(bool int uint float string)
-func isGenericTypeName(typeName string, isStar bool) bool {
+func isBaseTypeName(typeName string, isStar bool) bool {
 	genericTypes := []string{"bool", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "float32", "float64", "string"}
 	for _, v := range genericTypes {
 		if isStar {
@@ -233,23 +245,52 @@ func isStar(expr ast.Expr) bool {
 }
 
 // 是否是基础类型的数组([]int []string)
-func isGenericSlice(expr ast.Expr) bool {
+func isNormalSlice(expr ast.Expr) bool {
 	switch typ := expr.(type) {
 	case *ast.SliceExpr:
-		return isGenericTypeName(getTypeName(typ.X), false)
+		return isBaseTypeName(getTypeName(typ.X), false)
 	case *ast.ArrayType:
-		return isGenericTypeName(getTypeName(typ.Elt), false)
+		return isBaseTypeName(getTypeName(typ.Elt), false)
 	}
 	return false
 }
 
-// slice的elem类型
+// 是否是基础类型的map(map[int]string)
+func isNormalMap(expr ast.Expr) bool {
+	switch typ := expr.(type) {
+	case *ast.MapType:
+		return isBaseTypeName(getTypeName(typ.Value), false)
+	}
+	return false
+}
+
+// 是否是map[int]*Item格式的map
+func isStarMap(expr ast.Expr) bool {
+	switch typ := expr.(type) {
+	case *ast.MapType:
+		return isStar(typ.Value)
+	}
+	return false
+}
+
+// slice和map的elem类型
 func getElemTypeName(expr ast.Expr) string {
 	switch typ := expr.(type) {
 	case *ast.SliceExpr:
 		return getTypeName(typ.X)
 	case *ast.ArrayType:
 		return getTypeName(typ.Elt)
+	case *ast.MapType:
+		return getTypeName(typ.Value)
+	}
+	return ""
+}
+
+// map的key类型
+func getKeyTypeName(expr ast.Expr) string {
+	switch typ := expr.(type) {
+	case *ast.MapType:
+		return getTypeName(typ.Key)
 	}
 	return ""
 }

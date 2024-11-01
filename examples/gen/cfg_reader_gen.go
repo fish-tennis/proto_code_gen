@@ -3,7 +3,7 @@ package gen
 
 import (
     
-	"github.com/fish-tennis/proto_code_gen/examples/pb"
+	"examples/pb"
 )
 
 
@@ -15,7 +15,14 @@ func NewExampleR(src *pb.Example) *ExampleR {
 	return &ExampleR{v:src}
 }
 
+func (r *ExampleR) IsNil() bool {
+	return r == nil || r.v == nil
+}
+
 func (r *ExampleR) Raw() *pb.Example {
+    if r == nil {
+        return nil
+    }
 	return r.v
 }
 
@@ -31,24 +38,18 @@ func (r *ExampleR) GetFloatField() float32 {
 	return r.v.GetFloatField()
 }
 
-func (r *ExampleR) GetInt32Slice() []int32 {
-	src := r.v.GetInt32Slice()
-    if src == nil {
-        return nil
-    }
-    copySlice := make([]int32,len(src))
-    copy(copySlice, src)
-    return copySlice
+func (r *ExampleR) LenOfInt32Slice() int {
+    return len(r.v.GetInt32Slice())
+}
+func (r *ExampleR) ElemOfInt32Slice(index int) int32 {
+    return r.v.GetInt32Slice()[index]
 }
 
-func (r *ExampleR) GetStringSlice() []string {
-	src := r.v.GetStringSlice()
-    if src == nil {
-        return nil
-    }
-    copySlice := make([]string,len(src))
-    copy(copySlice, src)
-    return copySlice
+func (r *ExampleR) LenOfStringSlice() int {
+    return len(r.v.GetStringSlice())
+}
+func (r *ExampleR) ElemOfStringSlice(index int) string {
+    return r.v.GetStringSlice()[index]
 }
 
 
@@ -56,16 +57,42 @@ func (r *ExampleR) GetSingleChild() *ChildR {
 	return NewChildR(r.v.GetSingleChild())
 }
 
-func (r *ExampleR) GetChildren() []*ChildR {
-	src := r.v.GetChildren()
-    if src == nil {
-        return nil
+func (r *ExampleR) LenOfChildSlice() int {
+    return len(r.v.GetChildSlice())
+}
+func (r *ExampleR) ElemOfChildSlice(index int) *ChildR {
+    return NewChildR(r.v.GetChildSlice()[index])
+}
+
+func (r *ExampleR) LenOfNormalMap() int {
+    return len(r.v.GetNormalMap())
+}
+func (r *ExampleR) ElemOfNormalMap(key int32) string {
+    return r.v.GetNormalMap()[key]
+}
+func (r *ExampleR) RangeNormalMap(f func(k int32,v string) bool) {
+    for k,v := range r.v.GetNormalMap() {
+        if !f(k,v) {
+            return
+        }
     }
-    sliceReader := make([]*ChildR,len(src))
-    for i,v := range src {
-        sliceReader[i] = NewChildR(v)
+}
+
+func (r *ExampleR) LenOfChildMap() int {
+    return len(r.v.GetChildMap())
+}
+func (r *ExampleR) ElemOfChildMap(key string) *ChildR {
+    if v,ok := r.v.GetChildMap()[key]; ok {
+        return NewChildR(v)
     }
-    return sliceReader
+    return nil
+}
+func (r *ExampleR) RangeChildMap(f func(k string,v *ChildR) bool) {
+    for k,v := range r.v.GetChildMap() {
+        if !f(k,NewChildR(v)) {
+            return
+        }
+    }
 }
 
 
@@ -77,7 +104,14 @@ func NewExample2R(src *pb.Example2) *Example2R {
 	return &Example2R{v:src}
 }
 
+func (r *Example2R) IsNil() bool {
+	return r == nil || r.v == nil
+}
+
 func (r *Example2R) Raw() *pb.Example2 {
+    if r == nil {
+        return nil
+    }
 	return r.v
 }
 
@@ -98,7 +132,14 @@ func NewExampleWithoutTagR(src *pb.ExampleWithoutTag) *ExampleWithoutTagR {
 	return &ExampleWithoutTagR{v:src}
 }
 
+func (r *ExampleWithoutTagR) IsNil() bool {
+	return r == nil || r.v == nil
+}
+
 func (r *ExampleWithoutTagR) Raw() *pb.ExampleWithoutTag {
+    if r == nil {
+        return nil
+    }
 	return r.v
 }
 
@@ -119,7 +160,14 @@ func NewChildR(src *pb.Child) *ChildR {
 	return &ChildR{v:src}
 }
 
+func (r *ChildR) IsNil() bool {
+	return r == nil || r.v == nil
+}
+
 func (r *ChildR) Raw() *pb.Child {
+    if r == nil {
+        return nil
+    }
 	return r.v
 }
 

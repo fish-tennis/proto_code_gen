@@ -2,7 +2,7 @@
 package gen
 
 import (
-  "github.com/fish-tennis/proto_code_gen/examples/pb"
+  "examples/pb"
 )
 
 
