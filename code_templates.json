@@ -15,5 +15,8 @@
     "MessageFilter": [
     ],
     "ProtoV2": false
+  },
+  "CommandMapping": {
+    "OutFile": "./examples/gen/message_command_mapping.json"
   }
 }

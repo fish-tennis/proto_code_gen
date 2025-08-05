@@ -78,6 +78,10 @@ type ReaderCodeTemplate struct {
 	ProtoV2 bool
 }
 
+type CommandMapping struct {
+	OutFile string
+}
+
 func (this *ReaderCodeTemplate) MatchFile(fileName string) bool {
 	for _, filter := range this.FileFilter {
 		if ok, _ := regexp.MatchString(filter, fileName); ok {
@@ -97,8 +101,9 @@ func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
 }
 
 type CodeTemplates struct {
-	Code   []*CodeTemplate
-	Reader *ReaderCodeTemplate
+	Code           []*CodeTemplate
+	Reader         *ReaderCodeTemplate
+	CommandMapping *CommandMapping
 }
 
 type ParserResult struct {
@@ -106,9 +111,9 @@ type ParserResult struct {
 	codeTemplates   []*CodeTemplate
 	readerTemplates *ReaderCodeTemplate
 	// 每个文件对应的有关键字标记的message列表
-	protoMap map[string][]*ProtoMessageStructInfo // key:protoName
+	protoMap map[string][]*ProtoMessageStructInfo // key:protoFileName
 	// 所有的message
-	allProto map[string][]*ProtoMessageStructInfo // key:protoName
+	allProto map[string][]*ProtoMessageStructInfo // key:protoFileName
 }
 
 func (this *ParserResult) GetCodeTemplate(key string) *CodeTemplate {
@@ -133,14 +138,12 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 	if err != nil {
 		return
 	}
-
 	for _, decl := range f.Decls {
 		// check if is generic declaration
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok {
 			continue
 		}
-
 		var typeSpec *ast.TypeSpec
 		for _, spec := range genDecl.Specs {
 			if ts, tsOK := spec.(*ast.TypeSpec); tsOK {
@@ -148,13 +151,11 @@ func ParseProtoCode(protoCodeFile string, parserResult *ParserResult) {
 				break
 			}
 		}
-
 		// skip if can't get type spec
 		if typeSpec == nil {
 			continue
 		}
 		//println(fmt.Sprintf("typeSpec:%v", typeSpec))
-
 		// not a struct, skip
 		structDecl, ok := typeSpec.Type.(*ast.StructType)
 		if !ok {
@@ -262,27 +263,25 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 		log.Fatal(err)
 	}
 	log.Printf("file count:%v", len(files))
-	for _, path := range files {
-		finfo, err := os.Stat(path)
+	for _, file := range files {
+		info, err := os.Stat(file)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		if finfo.IsDir() {
+		if info.IsDir() {
 			continue
 		}
-
 		// It should end with ".pb.go" at a minimum.
-		if !strings.HasSuffix(strings.ToLower(finfo.Name()), ".pb.go") {
+		if !strings.HasSuffix(strings.ToLower(info.Name()), ".pb.go") {
 			continue
 		}
-
-		ParseProtoCode(path, parserResult)
+		ParseProtoCode(file, parserResult)
 	}
 	for _, codeTemplate := range parserResult.codeTemplates {
 		generateCode(parserResult, codeTemplate.KeyComment)
 	}
 	generatePbReader(parserResult)
+	generateCommandMapping(parserResult, codeTemplates.CommandMapping.OutFile)
 }
 
 // 从json文件加载代码模板配置
