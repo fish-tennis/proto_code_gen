@@ -1,4 +1,24 @@
 # proto_code_gen
+使用protobuf的项目,一般用protoc生成*.pb.go文件,proto_code_gen可以分析生成的*.pb.go文件,做一些预处理
+
+这样proto_code_gen就可以集成到项目的工作链中
+
+proto_code_gen目前提供3个功能:
+ - 生成proto的Message结构的只读接口(应用场景:proto当作配置数据的格式)
+ - 生成proto的Message的消息号(应用场景:proto当作网络消息协议)
+ - 根据proto的Message的自定义的struct tag生成对应的代码(应用场景:给proto的Message增加一些自定义的设置,如struct tag)
+
+## 应用场景1: 配置数据的只读接口
+某些应用场景,会使用protobuf的结构来当作配置数据的格式,proto_code_gen提供了一种生成protobuf只读接口的功能,类似c++中的const.
+
+如examples里的examples/reader_gen.go.template模板对应生成代码examples/gen/cfg_reader_gen.go
+
+如[https://github.com/fish-tennis/gserver/tree/main/gen](https://github.com/fish-tennis/gserver/tree/main/gen)目录下的代码就是使用proto_code_gen生成的
+
+## 应用场景2: 自动生成网络消息协议号
+某些应用场景,会使用消息号+protobuf来做网络协议,proto_code_gen可以根据proto的message名自动生成网络消息协议号,并解决消息号冲突的问题.
+
+## 应用场景3:生成模板代码
 项目中,我们经常希望能给proto生成message增加一些自定义的设置,如struct tag.
 
 增加自定义的struct tag,可以用[protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag)
@@ -7,7 +27,6 @@
 
 proto_code_gen提供了一种给message增加类似struct tag的方式
 
-## 应用场景1:生成模板代码
 Step1: 在proto文件中,使用自定义tag,示例参考examples/proto/cfg.proto
 ```proto
 // file: examples/proto/cfg.proto
@@ -30,7 +49,7 @@ Step3: 配置代码模板,示例参考examples/message_gen.go.template,examples/
 
 模板使用go自带的text/template
 
-Step4: 运行protoc_code_gen -input=/examples/pb/*.pb.go -config=./code_templates.json
+Step4: 运行protoc_code_gen -input=/examples/pb/*.pb.go -config=./proto_code_gen.yaml
 
 会根据模板生成对应的代码,如examples/gen/example_gen.go,examples/gen/cfg_reader_gen.go
 ```go
@@ -46,13 +65,6 @@ func ExampleToString(m *Example) string {
 }
 ```
 
-## 应用场景2: 配置数据的只读接口
-某些应用场景,会使用protobuf的结构来当作配置数据的格式,proto_code_gen提供了一种生成protobuf只读接口的功能,类似c++中的const.
-
-如examples里的examples/reader_gen.go.template模板对应生成代码examples/gen/cfg_reader_gen.go
-
-如[https://github.com/fish-tennis/gserver/tree/main/gen](https://github.com/fish-tennis/gserver/tree/main/gen)目录下的代码就是使用proto_code_gen生成的
-
 ## 使用proto_code_gen
 获取
 ```console
@@ -60,12 +72,8 @@ go get github.com/fish-tennis/proto_code_gen
 ```
 运行
 ```console
-protoc_code_gen -input=/dir/*.pb.go -config=./code_templates.json
+protoc_code_gen -input=/dir/*.pb.go -config=./proto_code_gen.yaml
 ```
-项目需要根据自己的需求,配置对应的代码模板,从而生成不同的代码.
-
-## 原理
-protoc_code_gen使用golang的parser库,解析*pb.go文件,读取其中的message结构体上的注释.
 
 ## 参考
 [protoc-go-inject-tag](https://github.com/favadi/protoc-go-inject-tag)

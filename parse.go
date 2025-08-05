@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"path"
@@ -51,35 +51,35 @@ type ReaderField struct {
 // 代码模板
 type CodeTemplate struct {
 	// 注释关键字,如@Player
-	KeyComment string
+	KeyComment string `yaml:"KeyComment"`
 
 	// 模板文件
-	Template string
+	Template string `yaml:"Template"`
 
 	// 生成文件名
-	OutFile string
+	OutFile string `yaml:"OutFile"`
 }
 
 // Reader代码模板
 type ReaderCodeTemplate struct {
 	// 模板文件
-	Template string
+	Template string `yaml:"Template"`
 
 	// 生成目录
-	OutDir string
+	OutDir string `yaml:"OutDir"`
 
 	// 处理哪些文件,支持正则
-	FileFilter []string
+	FileFilter []string `yaml:"FileFilter"`
 
 	// 处理哪些message,支持正则
-	MessageFilter []string
+	MessageFilter []string `yaml:"MessageFilter"`
 
 	// 是否使用proto2
-	ProtoV2 bool
+	ProtoV2 bool `yaml:"ProtoV2"`
 }
 
 type CommandMapping struct {
-	OutFile string
+	OutFile string `yaml:"OutFile"`
 }
 
 func (this *ReaderCodeTemplate) MatchFile(fileName string) bool {
@@ -101,9 +101,9 @@ func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
 }
 
 type CodeTemplates struct {
-	Code           []*CodeTemplate
-	Reader         *ReaderCodeTemplate
-	CommandMapping *CommandMapping
+	Code           []*CodeTemplate     `yaml:"Code"`
+	Reader         *ReaderCodeTemplate `yaml:"Reader"`
+	CommandMapping *CommandMapping     `yaml:"CommandMapping"`
 }
 
 type ParserResult struct {
@@ -277,10 +277,13 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 		}
 		ParseProtoCode(file, parserResult)
 	}
+	// 生成代码模板
 	for _, codeTemplate := range parserResult.codeTemplates {
 		generateCode(parserResult, codeTemplate.KeyComment)
 	}
+	// 生成只读接口
 	generatePbReader(parserResult)
+	// 生成消息号
 	generateCommandMapping(parserResult, codeTemplates.CommandMapping.OutFile)
 }
 
@@ -290,10 +293,17 @@ func initCodeTemplatesConfig(config string) *CodeTemplates {
 	if err != nil {
 		panic("read config file err")
 	}
-	var codeTemplates CodeTemplates
-	err = json.Unmarshal(fileData, &codeTemplates)
+	codeTemplates := &CodeTemplates{
+		Code: make([]*CodeTemplate, 0),
+		Reader: &ReaderCodeTemplate{
+			FileFilter:    make([]string, 0),
+			MessageFilter: make([]string, 0),
+		},
+		CommandMapping: &CommandMapping{},
+	}
+	err = yaml.Unmarshal(fileData, codeTemplates)
 	if err != nil {
 		panic(err)
 	}
-	return &codeTemplates
+	return codeTemplates
 }

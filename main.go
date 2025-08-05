@@ -9,7 +9,7 @@ import (
 func main() {
 	var codeTemplatesConfigFile, inputFiles string
 	flag.StringVar(&inputFiles, "input", "", "pattern to match input *.pb.go file(s)")
-	flag.StringVar(&codeTemplatesConfigFile, "config", "code_templates.json", "code template config")
+	flag.StringVar(&codeTemplatesConfigFile, "config", "proto_code_gen.yaml", "code template config")
 	flag.Parse()
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
