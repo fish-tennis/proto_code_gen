@@ -48,7 +48,7 @@ type ReaderField struct {
 	IsPtrMap       bool // pointer map,如map[int32]*Item
 }
 
-// 代码模板
+// 自定义tag代码模板
 type CodeTemplate struct {
 	// 注释关键字,如@Player
 	KeyComment string `yaml:"KeyComment"`
@@ -103,6 +103,7 @@ func (this *ReaderCodeTemplate) MatchMessage(messageName string) bool {
 type CodeTemplates struct {
 	Code           []*CodeTemplate     `yaml:"Code"`
 	Reader         *ReaderCodeTemplate `yaml:"Reader"`
+	ProtoCodes     *ReaderCodeTemplate `yaml:"ProtoCodes"`
 	CommandMapping *CommandMapping     `yaml:"CommandMapping"`
 }
 
@@ -277,7 +278,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 		}
 		ParseProtoCode(file, parserResult)
 	}
-	// 生成代码模板
+	// 根据proto里面的自定义tag生成代码模板
 	for _, codeTemplate := range parserResult.codeTemplates {
 		generateCode(parserResult, codeTemplate.KeyComment)
 	}
@@ -285,6 +286,7 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	generatePbReader(parserResult)
 	// 生成消息号
 	generateCommandMapping(parserResult, codeTemplates.CommandMapping.OutFile)
+	generateProtoCodes(parserResult, codeTemplates.ProtoCodes)
 }
 
 // 从json文件加载代码模板配置
@@ -305,5 +307,16 @@ func initCodeTemplatesConfig(config string) *CodeTemplates {
 	if err != nil {
 		panic(err)
 	}
+	autoCheckDir(&codeTemplates.Reader.OutDir)
+	autoCheckDir(&codeTemplates.ProtoCodes.OutDir)
 	return codeTemplates
+}
+
+func autoCheckDir(dir *string) {
+	if *dir == "" {
+		return
+	}
+	if !strings.HasSuffix(*dir, "/") && !strings.HasSuffix(*dir, "\\") {
+		*dir = *dir + "/"
+	}
 }

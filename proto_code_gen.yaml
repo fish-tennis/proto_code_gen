@@ -11,11 +11,13 @@ Reader:
   MessageFilter:
   #是否是proto v2版本
   ProtoV2: false
+
 #自动生成消息号
 CommandMapping:
   #输出文件
   OutFile: "./examples/gen/message_command_mapping.json"
-#根据模板生成代码
+
+#根据proto里的自定义tag生成代码
 Code:
     # proto的message结构体注释的关键字
   - KeyComment: "@StructTagOfExample"
@@ -23,3 +25,17 @@ Code:
     Template: "./examples/message_gen.go.template"
     # 输出文件
     OutFile: "./examples/gen/example_gen.go"
+
+#根据proto文件列表生成代码
+ProtoCodes:
+  #代码模板
+  Template: "./csharp_cs.template"
+  #代码输出目录
+  OutDir: "./examples/gen"
+  #文件名匹配
+  FileFilter:
+    - ".*.pb.go"
+  #结构体名匹配
+  MessageFilter:
+  #是否是proto v2版本
+  ProtoV2: false

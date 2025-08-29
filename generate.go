@@ -156,7 +156,7 @@ func generatePbReader(parserResult *ParserResult) {
 			}
 			outMessageCount++
 		}
-		outFileName := fmt.Sprintf("%v/%v_reader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
+		outFileName := fmt.Sprintf("%v%v_reader_gen.go", parserResult.readerTemplates.OutDir, strings.TrimSuffix(protoName, ".pb.go"))
 		if outMessageCount > 0 {
 			err = os.Mkdir(path.Dir(outFileName), os.ModePerm)
 			if err != nil && !os.IsExist(err) {
@@ -184,6 +184,53 @@ func generatePbReader(parserResult *ParserResult) {
 		}
 	}
 	log.Printf("generate reader fileCount:%v messageCount:%v", generateFileCount, generateMessageCount)
+}
+
+func generateProtoCodes(parserResult *ParserResult, codeTemplate *ReaderCodeTemplate) {
+	// 排序一下,避免proto文件没改动,生成的代码文件却不一样
+	var sortProtoList []string
+	for protoName, _ := range parserResult.allProto {
+		sortProtoList = append(sortProtoList, UpperWordsToCamelCase(strings.TrimSuffix(protoName, ".pb.go"), "_", true))
+	}
+	sort.Slice(sortProtoList, func(i, j int) bool {
+		return sortProtoList[i] < sortProtoList[j]
+	})
+	var messageList []*ProtoMessageStructInfo
+	for _, structInfoList := range parserResult.allProto {
+		for _, structInfo := range structInfoList {
+			messageList = append(messageList, structInfo)
+		}
+	}
+	outFileName := codeTemplate.OutDir + strings.TrimSuffix(path.Base(codeTemplate.Template), ".template")
+	if len(messageList) == 0 {
+		os.Remove(outFileName)
+		return
+	}
+	tmpl, err := template.ParseFiles(codeTemplate.Template)
+	if err != nil {
+		log.Printf("parse Template file failed:%v %v", codeTemplate.Template, err)
+		return
+	}
+	err = os.Mkdir(path.Dir(outFileName), os.ModePerm)
+	if err != nil && !os.IsExist(err) {
+		log.Printf("create dir failed:%v %v", path.Dir(outFileName), err)
+		return
+	}
+	outFile, err := os.OpenFile(outFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		log.Printf("open OutFile failed:%v %v", outFile, err)
+		return
+	}
+	defer outFile.Close()
+	err = tmpl.Execute(outFile, map[string]any{
+		"MessageList": messageList,
+		"ProtoList":   sortProtoList,
+	})
+	if err != nil {
+		log.Printf("Execute Template failed:%v %v", outFileName, err)
+		return
+	}
+	log.Printf("generate code:%v protoFileCount:%v", outFileName, len(sortProtoList))
 }
 
 // 是否是基础类型(bool int uint float string)

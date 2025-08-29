@@ -14,13 +14,7 @@ namespace Gserver {
 		static GlobalFileDescriptorSet() {
 			fileDescriptors = new List<FileDescriptor>()
 			
-			fileDescriptors.Add(ExampleReflection.Descriptor);
-			
-			fileDescriptors.Add(Example2Reflection.Descriptor);
-			
-			fileDescriptors.Add(ExampleWithoutTagReflection.Descriptor);
-			
-			fileDescriptors.Add(ChildReflection.Descriptor);
+			fileDescriptors.Add(CfgReflection.Descriptor);
 			
 		}
 	}

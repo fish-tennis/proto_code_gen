@@ -68,7 +68,7 @@ func generateCommandMapping(parserResult *ParserResult, outputFile string) error
 			break
 		}
 		if !hasNewCmd {
-			log.Printf("conflictErr message:%v")
+			log.Printf("conflictErr message:%v", messageName)
 		}
 	}
 	fileData, err := json.Marshal(mapping)
