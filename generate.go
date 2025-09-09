@@ -63,6 +63,9 @@ func generateCode(parserResult *ParserResult, key string) {
 
 func generatePbReader(parserResult *ParserResult) {
 	readerConfig := parserResult.readerTemplates
+	if readerConfig == nil {
+		return
+	}
 	if readerConfig.OutDir == "" && len(readerConfig.FileFilter) == 0 && len(readerConfig.MessageFilter) == 0 {
 		return
 	}

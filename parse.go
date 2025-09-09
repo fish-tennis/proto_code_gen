@@ -285,8 +285,13 @@ func ParseFiles(pbGoFilePattern string, codeTemplatesConfig string) {
 	// 生成只读接口
 	generatePbReader(parserResult)
 	// 生成消息号
-	generateCommandMapping(parserResult, codeTemplates.CommandMapping.OutFile)
-	generateProtoCodes(parserResult, codeTemplates.ProtoCodes)
+	if codeTemplates.CommandMapping != nil {
+		generateCommandMapping(parserResult, codeTemplates.CommandMapping.OutFile)
+	}
+	// 根据proto生成代码
+	if codeTemplates.ProtoCodes != nil {
+		generateProtoCodes(parserResult, codeTemplates.ProtoCodes)
+	}
 }
 
 // 从json文件加载代码模板配置
@@ -307,8 +312,12 @@ func initCodeTemplatesConfig(config string) *CodeTemplates {
 	if err != nil {
 		panic(err)
 	}
-	autoCheckDir(&codeTemplates.Reader.OutDir)
-	autoCheckDir(&codeTemplates.ProtoCodes.OutDir)
+	if codeTemplates.Reader != nil {
+		autoCheckDir(&codeTemplates.Reader.OutDir)
+	}
+	if codeTemplates.ProtoCodes != nil {
+		autoCheckDir(&codeTemplates.ProtoCodes.OutDir)
+	}
 	return codeTemplates
 }
 
