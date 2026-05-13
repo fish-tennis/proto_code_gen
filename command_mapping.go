@@ -7,53 +7,41 @@ import (
 	"os"
 )
 
-// 自动生成proto.Message和PacketCommand的映射
-func generateCommandMapping(parserResult *ParserResult, outputFile string) error {
-	if outputFile == "" {
-		return nil
-	}
-	// 加载之前保存的数据
-	mapping := loadCommandMapping(outputFile)
+func resolveCommandMapping(allMessageNames []string, existingMapping map[string]int) map[string]int {
 	cmdMapping := make(map[int]string)
-	for messageName, cmd := range mapping {
+	for messageName, cmd := range existingMapping {
 		if _, ok := cmdMapping[cmd]; ok {
 			log.Printf("conflict message:%v cmd:%v", messageName, cmd)
-			delete(mapping, messageName)
+			delete(existingMapping, messageName)
 			continue
 		}
 		cmdMapping[cmd] = messageName
 	}
 	conflict := make(map[string]int)
 	allMessages := make(map[string]int)
-	// 遍历所有Message,用hash算法,根据消息名生成消息号
-	for _, structInfoList := range parserResult.allProto {
-		for _, structInfo := range structInfoList {
-			cmd := uint16(crc32.ChecksumIEEE([]byte(structInfo.MessageName)) & 0xFFFF)
-			allMessages[structInfo.MessageName] = int(cmd)
-		}
+	for _, messageName := range allMessageNames {
+		cmd := uint16(crc32.ChecksumIEEE([]byte(messageName)) & 0xFFFF)
+		allMessages[messageName] = int(cmd)
 	}
-	// 删除已经不存在的消息
-	for messageName, cmd := range mapping {
+	for messageName, cmd := range existingMapping {
 		if _, ok := allMessages[messageName]; !ok {
-			delete(mapping, messageName)
+			delete(existingMapping, messageName)
 			delete(cmdMapping, cmd)
 		}
 	}
-	// 记录冲突的消息
 	for messageName, cmd := range allMessages {
-		oldCmd, ok := mapping[messageName]
+		oldCmd, ok := existingMapping[messageName]
 		if ok && cmd != oldCmd {
-			conflict[messageName] = cmd // hash冲突的message
+			conflict[messageName] = cmd
 			continue
 		}
 		if cmd == 0 {
-			conflict[messageName] = cmd // 消息号不能为0
+			conflict[messageName] = cmd
 			continue
 		}
-		mapping[messageName] = cmd
+		existingMapping[messageName] = cmd
 		cmdMapping[cmd] = messageName
 	}
-	// 冲突的消息,自动查找未使用的消息号,解决冲突
 	for messageName, cmd := range conflict {
 		log.Printf("conflict message:%v cmd:%v", messageName, cmd)
 		hasNewCmd := false
@@ -62,7 +50,7 @@ func generateCommandMapping(parserResult *ParserResult, outputFile string) error
 				continue
 			}
 			cmdMapping[i] = messageName
-			mapping[messageName] = i
+			existingMapping[messageName] = i
 			hasNewCmd = true
 			log.Printf("conflict message:%v newCmd:%v", messageName, i)
 			break
@@ -71,6 +59,10 @@ func generateCommandMapping(parserResult *ParserResult, outputFile string) error
 			log.Printf("conflictErr message:%v", messageName)
 		}
 	}
+	return existingMapping
+}
+
+func saveCommandMapping(mapping map[string]int, outputFile string) error {
 	fileData, err := json.Marshal(mapping)
 	if err != nil {
 		log.Printf("generateCommandMapping json.Marshal Err fileName:%v err:%v", outputFile, err)
@@ -82,6 +74,21 @@ func generateCommandMapping(parserResult *ParserResult, outputFile string) error
 		return err
 	}
 	return nil
+}
+
+func generateCommandMapping(parserResult *ParserResult, outputFile string) error {
+	if outputFile == "" {
+		return nil
+	}
+	mapping := loadCommandMapping(outputFile)
+	var allMessageNames []string
+	for _, structInfoList := range parserResult.allProto {
+		for _, structInfo := range structInfoList {
+			allMessageNames = append(allMessageNames, structInfo.MessageName)
+		}
+	}
+	mapping = resolveCommandMapping(allMessageNames, mapping)
+	return saveCommandMapping(mapping, outputFile)
 }
 
 func loadCommandMapping(fileName string) map[string]int {
