@@ -1,6 +1,0 @@
-CommandMapping:
-  OutFile: "./examples/gen/message_command_mapping.json"
-
-ProtoCodes:
-  Template: "./csharp_cs.template"
-  OutDir: "./examples/gen/"

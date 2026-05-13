@@ -3,8 +3,6 @@ syntax = "proto3";
 package pb;
 option go_package = "/pb";
 
-// 测试message's struct tag
-// @StructTagOfExample
 message Example {
   int32 Int32Field = 1;
   string StringField = 2;
@@ -17,14 +15,7 @@ message Example {
   map<string,Child> ChildMap = 9;
 }
 
-// 测试message's struct tag with value
-// @StructTagOfExample:testValue
 message Example2 {
-  int32 Int32Field = 1;
-  string StringField = 2;
-}
-
-message ExampleWithoutTag {
   int32 Int32Field = 1;
   string StringField = 2;
 }

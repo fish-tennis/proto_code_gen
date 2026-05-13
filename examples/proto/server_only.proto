@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package pb;
+option go_package = "/pb";
+
+// 踢玩家下线req
+message KickPlayerReq {
+  int64 AccountId = 1; // 账号id
+  int64 PlayerId = 2; // 玩家id
+}
+
+// 踢玩家下线res
+message KickPlayerRes {
+  string Error = 1;
+  int64 AccountId = 2; // 账号id
+  int64 PlayerId = 3; // 玩家id
+}
+
+// 客户端掉线
+message ClientDisconnect {
+  uint32 ClientConnId = 1;
+}
+
+// 服务器连接上其他服务器时,发的初始化信息
+message ServerHello {
+  int32 ServerId = 1; // 服务器id
+  string ServerType = 2; // 服务器类型
+}

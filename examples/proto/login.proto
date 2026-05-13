@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package pb;
+option go_package = "/pb";
+
+message LoginReq {
+  string Account = 1;
+  string Pwd = 2;
+}
+
+message LoginRes {
+  int32 UserId = 1;
+  string Account = 2;
+  string ErrorMsg = 3;
+}

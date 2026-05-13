@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/bufbuild/protocompile"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"gopkg.in/yaml.v3"
 )
 
 type ProtoMessageStructInfo struct {
@@ -21,36 +18,37 @@ type ProtoMessageStructInfo struct {
 	PackageName string
 }
 
-type CodeTemplate struct {
-	Template string `yaml:"Template"`
-	OutDir   string `yaml:"OutDir"`
-}
-
-type CommandMapping struct {
-	OutFile string `yaml:"OutFile"`
-}
-
-type Configs struct {
-	ProtoCodes     *CodeTemplate   `yaml:"ProtoCodes"`
-	CommandMapping *CommandMapping `yaml:"CommandMapping"`
-}
-
 type ParserResult struct {
 	allProto map[string][]*ProtoMessageStructInfo
 }
 
-func ParseFiles(protoFilePattern string, codeTemplatesConfig string) {
-	configs := loadConfig(codeTemplatesConfig)
-
-	files, err := filepath.Glob(protoFilePattern)
+func ParseFiles(protoDir string, excludeFiles []string) *ParserResult {
+	files, err := filepath.Glob(filepath.Join(protoDir, "*.proto"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	if len(files) == 0 {
-		log.Fatal("no proto files matched")
+		log.Fatal("no proto files found in directory: " + protoDir)
 	}
 
-	importPath := findCommonParent(files)
+	excludeSet := make(map[string]bool)
+	for _, e := range excludeFiles {
+		excludeSet[e] = true
+	}
+
+	var filteredFiles []string
+	for _, f := range files {
+		if excludeSet[filepath.Base(f)] {
+			log.Printf("excluding proto file: %s", f)
+			continue
+		}
+		filteredFiles = append(filteredFiles, f)
+	}
+	if len(filteredFiles) == 0 {
+		log.Fatal("no proto files to parse after exclusion")
+	}
+
+	importPath := findCommonParent(filteredFiles)
 
 	compiler := protocompile.Compiler{
 		Resolver: &protocompile.SourceResolver{
@@ -60,7 +58,7 @@ func ParseFiles(protoFilePattern string, codeTemplatesConfig string) {
 	}
 
 	var relFiles []string
-	for _, f := range files {
+	for _, f := range filteredFiles {
 		rel, err := filepath.Rel(importPath, f)
 		if err != nil {
 			log.Fatal(err)
@@ -92,16 +90,7 @@ func ParseFiles(protoFilePattern string, codeTemplatesConfig string) {
 		}
 	}
 
-	if configs.CommandMapping != nil {
-		err := generateCommandMapping(parserResult, configs.CommandMapping.OutFile)
-		if err != nil {
-			log.Fatal(fmt.Sprintf("generateCommandMappingErr:%v", err))
-			return
-		}
-	}
-	if configs.ProtoCodes != nil {
-		generateCodes(parserResult, configs.ProtoCodes)
-	}
+	return parserResult
 }
 
 func findCommonParent(files []string) string {
@@ -143,35 +132,4 @@ func extractMessageComment(md protoreflect.MessageDescriptor) string {
 		return ""
 	}
 	return strings.TrimSpace(loc.LeadingComments)
-}
-
-func loadConfig(config string) *Configs {
-	fileData, err := os.ReadFile(config)
-	if err != nil {
-		panic("read config file err")
-	}
-	configs := &Configs{
-		ProtoCodes:     &CodeTemplate{},
-		CommandMapping: &CommandMapping{},
-	}
-	err = yaml.Unmarshal(fileData, configs)
-	if err != nil {
-		panic(err)
-	}
-	//if configs.Reader != nil {
-	//	autoCheckDir(&configs.Reader.OutDir)
-	//}
-	if configs.ProtoCodes != nil {
-		autoCheckDir(&configs.ProtoCodes.OutDir)
-	}
-	return configs
-}
-
-func autoCheckDir(dir *string) {
-	if *dir == "" {
-		return
-	}
-	if !strings.HasSuffix(*dir, "/") && !strings.HasSuffix(*dir, "\\") {
-		*dir = *dir + "/"
-	}
 }

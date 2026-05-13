@@ -76,18 +76,37 @@ func saveCommandMapping(mapping map[string]int, outputFile string) error {
 	return nil
 }
 
-func generateCommandMapping(parserResult *ParserResult, outputFile string) error {
+func generateCommandMapping(parserResult *ParserResult, outputFile string, excludeFiles []string, outputExcludeFiles []string) error {
 	if outputFile == "" {
 		return nil
 	}
 	mapping := loadCommandMapping(outputFile)
+	excludeSet := make(map[string]bool)
+	for _, f := range excludeFiles {
+		excludeSet[f] = true
+	}
 	var allMessageNames []string
-	for _, structInfoList := range parserResult.allProto {
+	for protoName, structInfoList := range parserResult.allProto {
+		if excludeSet[protoName] {
+			continue
+		}
 		for _, structInfo := range structInfoList {
 			allMessageNames = append(allMessageNames, structInfo.MessageName)
 		}
 	}
 	mapping = resolveCommandMapping(allMessageNames, mapping)
+	oeSet := make(map[string]bool)
+	for _, f := range outputExcludeFiles {
+		oeSet[f] = true
+	}
+	for protoName, structInfoList := range parserResult.allProto {
+		if !oeSet[protoName] {
+			continue
+		}
+		for _, structInfo := range structInfoList {
+			delete(mapping, structInfo.MessageName)
+		}
+	}
 	return saveCommandMapping(mapping, outputFile)
 }
 
