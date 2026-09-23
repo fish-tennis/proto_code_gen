@@ -107,11 +107,14 @@ func resolveCommandMapping(allMessageNames []string, existingMapping map[string]
 }
 
 func saveCommandMapping(mapping map[string]int, outputFile string) error {
-	fileData, err := json.Marshal(mapping)
+	// MarshalIndent:易读的多行缩进格式;map按键名字典序输出,diff友好且稳定
+	// 末尾补换行,符合文本文件惯例(避免git提示"No newline at end of file")
+	fileData, err := json.MarshalIndent(mapping, "", "    ")
 	if err != nil {
 		log.Printf("generateCommandMapping json.Marshal Err fileName:%v err:%v", outputFile, err)
 		return err
 	}
+	fileData = append(fileData, '\n')
 	err = os.WriteFile(outputFile, fileData, 0644)
 	if err != nil {
 		log.Printf("generateCommandMapping os.WriteFile Err fileName:%v err:%v", outputFile, err)
